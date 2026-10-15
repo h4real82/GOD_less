@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # ⚡ GOD:less (Black & White Ultra)
 
 Göttliche 3D-Echtzeit-Strategie & Chimären-Kreaturen-Simulation im Browser (Three.js + Vite + Tailwind CSS).
@@ -45,3 +46,7 @@ Göttliche 3D-Echtzeit-Strategie & Chimären-Kreaturen-Simulation im Browser (Th
    ```bash
    npm run build
    ```
+=======
+# Black-White-Ultra
+Browser Version of Black &amp; White 2
+>>>>>>> 855b8ee8940c1f57f6f4cc5ea2654841da8701a9
