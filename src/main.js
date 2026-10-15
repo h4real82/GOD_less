@@ -1330,15 +1330,15 @@ import './ui/cardTilt.js';
             handOfGod.palmOrb.position.set(0, -0.58, -0.45);
             palmGroup.add(handOfGod.palmOrb);
 
-            // Volumetric Floating Cloud Cuff around the Wrist (sample1.jpg)
+            // Volumetric Floating Cloud Cuff around the Wrist (entfernt für edle goldene Aura)
             const mistTex = AssetForge.createCloudMistSpriteTexture();
             for (let c = 0; c < 6; c++) {
                 const sp = new THREE.Sprite(
-                    new THREE.SpriteMaterial({ map: mistTex, transparent: true, opacity: 0.62, depthWrite: false })
+                    new THREE.SpriteMaterial({ map: mistTex, transparent: true, opacity: 0.15, depthWrite: false, color: 0xf59e0b })
                 );
                 const ang = (c / 6) * Math.PI * 2;
                 sp.position.set(Math.cos(ang) * 0.85, 0.25, 1.35 + Math.sin(ang) * 0.45);
-                sp.scale.set(2.9, 2.9, 1);
+                sp.scale.set(1.5, 1.5, 1);
                 palmGroup.add(sp);
                 handOfGod.cloudSprites.push(sp);
             }
