@@ -1,0 +1,3666 @@
+<!DOCTYPE html>
+<html lang="de" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Black & White Ultra — 3D God Game</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js WebGL Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Google Fonts: Cinzel Decorative, Cinzel & Plus Jakarta Sans -->
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Cinzel:wght@600;700;900&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --font-display: 'Cinzel Decorative', 'Cinzel', serif;
+            --font-serif: 'Cinzel', serif;
+            --font-sans: 'Plus Jakarta Sans', sans-serif;
+        }
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #04060d;
+            color: #f8fafc;
+            font-family: var(--font-sans);
+        }
+        .font-cinzel {
+            font-family: var(--font-serif);
+        }
+        .font-monumental {
+            font-family: var(--font-display);
+        }
+
+        /* 3D WebGL & Overlay Canvases */
+        #webgl-container {
+            position: fixed;
+            inset: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+        }
+        #gesture-canvas {
+            position: fixed;
+            inset: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 12;
+            pointer-events: none;
+        }
+        #lightning-fx-canvas {
+            position: fixed;
+            inset: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 48;
+            pointer-events: none;
+        }
+
+        /* Divine Glassmorphism Panels */
+        .god-panel {
+            background: rgba(9, 13, 26, 0.82);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(251, 191, 36, 0.25);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+        .god-panel-gold {
+            background: linear-gradient(145deg, rgba(17, 24, 39, 0.92), rgba(7, 10, 20, 0.96));
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(251, 191, 36, 0.45);
+            box-shadow: 0 16px 50px rgba(0, 0, 0, 0.85), 0 0 30px rgba(251, 191, 36, 0.15);
+        }
+
+        /* Monumental Title Glow */
+        .bw-monument-title {
+            letter-spacing: 0.12em;
+            text-shadow:
+                0 0 25px rgba(251, 191, 36, 0.55),
+                0 0 55px rgba(239, 68, 68, 0.35),
+                0 6px 18px rgba(0, 0, 0, 0.95);
+        }
+
+        /* "Gottloser Scroller-Effekt" (3D Perspective Parallax Carousel) */
+        .ungodly-scroller-viewport {
+            perspective: 1400px;
+            overflow-x: auto;
+            overflow-y: visible;
+            scroll-behavior: smooth;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            padding: 22px 16px;
+        }
+        .ungodly-scroller-viewport::-webkit-scrollbar {
+            display: none;
+        }
+        .ungodly-card {
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+                        box-shadow 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+                        border-color 0.35s ease;
+            background: linear-gradient(160deg, rgba(15, 23, 42, 0.92) 0%, rgba(5, 8, 17, 0.97) 100%);
+            border: 1px solid rgba(148, 163, 184, 0.25);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.85);
+            overflow: hidden;
+        }
+        .ungodly-card::before {
+            content: '';
+            position: absolute;
+            inset: -2px;
+            background: conic-gradient(from 180deg at 50% 50%, rgba(251, 191, 36, 0) 0deg, rgba(251, 191, 36, 0.6) 90deg, rgba(244, 63, 94, 0.65) 180deg, rgba(56, 189, 248, 0.6) 270deg, rgba(251, 191, 36, 0) 360deg);
+            opacity: 0;
+            transition: opacity 0.35s ease;
+            z-index: 0;
+            pointer-events: none;
+        }
+        .ungodly-card:hover {
+            transform: translateY(-10px) scale(1.035) rotateX(4deg);
+            border-color: rgba(251, 191, 36, 0.85);
+            box-shadow:
+                0 28px 65px rgba(0, 0, 0, 0.95),
+                0 0 35px rgba(251, 191, 36, 0.35),
+                0 0 60px rgba(244, 63, 94, 0.22);
+        }
+        .ungodly-card:hover::before {
+            opacity: 0.22;
+        }
+        .ungodly-card-inner {
+            position: relative;
+            z-index: 2;
+        }
+
+        /* Interactive Buttons */
+        .god-btn {
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            cursor: pointer;
+        }
+        .god-btn:hover {
+            transform: translateY(-2px);
+            filter: brightness(1.12);
+        }
+        .god-btn:active {
+            transform: translateY(1px) scale(0.98);
+        }
+
+        /* Floating 3D World Labels */
+        .world-label {
+            position: absolute;
+            transform: translate(-50%, -100%);
+            pointer-events: none;
+            white-space: nowrap;
+            transition: opacity 0.2s ease;
+        }
+
+        /* Custom Scrollbars for Modals */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(251, 191, 36, 0.45);
+            border-radius: 9999px;
+        }
+
+        @keyframes cosmicBannerAnim {
+            0% { transform: translate(-50%, -25px); opacity: 0; }
+            100% { transform: translate(-50%, 0); opacity: 1; }
+        }
+        .cosmic-banner-enter {
+            animation: cosmicBannerAnim 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+    </style>
+</head>
+
+<body oncontextmenu="return false;">
+
+    <!-- 1. 3D WebGL Island World Viewport (Runs live behind Start Screen & In-Game) -->
+    <div id="webgl-container"></div>
+
+    <!-- 2. 2D Miracle Gesture Drawing Canvas (Right-click runes in-game) -->
+    <canvas id="gesture-canvas"></canvas>
+
+    <!-- 3. Interactive Mouse-Triggered Lightning & Divine Aura Canvas -->
+    <canvas id="lightning-fx-canvas"></canvas>
+
+    <!-- 4. Floating 3D World Labels (Settlements, Creature Thoughts) -->
+    <div id="world-labels-container" class="fixed inset-0 pointer-events-none overflow-hidden z-10"></div>
+
+    <!-- ===================================================================== -->
+    <!-- MONUMENTAL START SCREEN (WITH UNGODLY SCROLLER & MOUSE LIGHTNING FX)  -->
+    <!-- ===================================================================== -->
+    <div id="start-screen" class="fixed inset-0 z-40 flex flex-col justify-between bg-gradient-to-b from-slate-950/85 via-slate-950/60 to-slate-950/90 backdrop-blur-sm overflow-y-auto p-4 sm:p-6">
+        
+        <!-- Top Subtle Status Bar on Start Screen -->
+        <div class="w-full max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2 z-10">
+            <div class="flex items-center gap-2.5 bg-slate-900/80 border border-amber-400/30 rounded-full px-3.5 py-1.5 text-xs">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span class="font-cinzel font-bold text-amber-300 tracking-wider">ENGINE BEREIT • WEBGL 3D & BLITZ-PHYSIK AKTIV</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <span id="start-discord-pill" class="bg-indigo-950/85 border border-indigo-400/40 text-indigo-200 rounded-full px-3.5 py-1.5 text-xs font-medium flex items-center gap-1.5">
+                    <i class="fa-brands fa-discord text-indigo-400"></i>
+                    <span id="start-discord-status-text">Discord: Bereit zum Verbinden</span>
+                </span>
+                <button onclick="openStartSubModal('settings-modal')" class="god-btn bg-slate-900/85 hover:bg-slate-800 border border-slate-700 text-slate-200 rounded-full px-3.5 py-1.5 text-xs font-semibold flex items-center gap-1.5">
+                    <i class="fa-solid fa-sliders text-amber-400"></i>
+                    <span>Settings</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Center Monumental Hero Headline, Lore Text & Ungodly Mode Scroller -->
+        <div class="w-full max-w-7xl mx-auto my-auto py-4 z-10 flex flex-col items-center">
+            
+            <!-- Unmistakable Emblem & Headline -->
+            <div class="text-center max-w-4xl mx-auto mb-5">
+                <div class="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-gradient-to-r from-rose-950/90 via-slate-900/90 to-sky-950/90 border border-amber-400/40 text-[11px] font-bold tracking-[0.25em] uppercase text-amber-300 mb-3 shadow-lg">
+                    <i class="fa-solid fa-bolt text-rose-400"></i>
+                    <span>Lionhead-Erbe • Götter-Simulation der nächsten Generation</span>
+                    <i class="fa-solid fa-dove text-sky-300"></i>
+                </div>
+
+                <h1 class="font-monumental bw-monument-title text-3xl sm:text-5xl md:text-6xl font-black tracking-widest uppercase leading-tight">
+                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-slate-100 via-amber-200 to-sky-300">BLACK</span>
+                    <span class="text-amber-400 mx-1 sm:mx-2">&amp;</span>
+                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-rose-400 to-red-600">WHITE</span>
+                    <span class="block sm:inline text-amber-400 text-2xl sm:text-4xl md:text-5xl ml-0 sm:ml-2">ULTRA</span>
+                </h1>
+
+                <p class="text-xs sm:text-sm md:text-base text-slate-300 mt-3 leading-relaxed max-w-2xl mx-auto font-normal">
+                    Aus dem Gebet der letzten Überlebenden wirst du geboren. Bewegst du deine Hand über die Welt, folgen dir <b class="text-amber-300">göttliche Blitze</b>. Wähle deinen Avatar, manifestiere den Glauben einer jungen Zivilisation durch 4 Epochen oder verbinde deinen <b class="text-indigo-300">Discord-Server</b> für gemeinsame Götterkriege!
+                </p>
+            </div>
+
+            <!-- Step 1: Creature Avatar Quick-Selector Bar -->
+            <div class="w-full max-w-3xl mb-5">
+                <div class="flex items-center justify-between text-xs text-amber-300/90 font-cinzel font-bold uppercase tracking-wider mb-2 px-1">
+                    <span><i class="fa-solid fa-paw mr-1.5"></i>Dein Göttlicher Kreaturen-Avatar</span>
+                    <span id="selected-creature-banner" class="text-emerald-300">Aktuell gewählt: 🦁 Titanen-Löwe</span>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                    <button onclick="chooseStartCreature('lion')" id="start-cre-lion" class="god-btn p-2.5 rounded-2xl bg-amber-500/25 border-2 border-amber-400 text-center flex items-center sm:flex-col justify-center gap-2 sm:gap-1 shadow-lg">
+                        <span class="text-2xl sm:text-3xl">🦁</span>
+                        <div>
+                            <div class="font-cinzel font-bold text-xs text-amber-200">Löwe</div>
+                            <div class="text-[10px] text-slate-300">Kriegs-Champion</div>
+                        </div>
+                    </button>
+                    <button onclick="chooseStartCreature('wolf')" id="start-cre-wolf" class="god-btn p-2.5 rounded-2xl bg-slate-900/80 border border-slate-700/80 text-center flex items-center sm:flex-col justify-center gap-2 sm:gap-1">
+                        <span class="text-2xl sm:text-3xl">🐺</span>
+                        <div>
+                            <div class="font-cinzel font-bold text-xs text-sky-200">Wolf</div>
+                            <div class="text-[10px] text-slate-300">Schneller Jäger</div>
+                        </div>
+                    </button>
+                    <button onclick="chooseStartCreature('ape')" id="start-cre-ape" class="god-btn p-2.5 rounded-2xl bg-slate-900/80 border border-slate-700/80 text-center flex items-center sm:flex-col justify-center gap-2 sm:gap-1">
+                        <span class="text-2xl sm:text-3xl">🦍</span>
+                        <div>
+                            <div class="font-cinzel font-bold text-xs text-emerald-200">Affe</div>
+                            <div class="text-[10px] text-slate-300">Meister-Bauer</div>
+                        </div>
+                    </button>
+                    <button onclick="chooseStartCreature('tiger')" id="start-cre-tiger" class="god-btn p-2.5 rounded-2xl bg-slate-900/80 border border-slate-700/80 text-center flex items-center sm:flex-col justify-center gap-2 sm:gap-1">
+                        <span class="text-2xl sm:text-3xl">🐯</span>
+                        <div>
+                            <div class="font-cinzel font-bold text-xs text-orange-200">Tiger</div>
+                            <div class="text-[10px] text-slate-300">Wildes Raubtier</div>
+                        </div>
+                    </button>
+                    <button onclick="chooseStartCreature('cow')" id="start-cre-cow" class="god-btn p-2.5 rounded-2xl bg-slate-900/80 border border-slate-700/80 text-center flex items-center sm:flex-col justify-center gap-2 sm:gap-1 col-span-2 sm:col-span-1">
+                        <span class="text-2xl sm:text-3xl">🐮</span>
+                        <div>
+                            <div class="font-cinzel font-bold text-xs text-pink-200">Heilige Kuh</div>
+                            <div class="text-[10px] text-slate-300">Friedens-Idol</div>
+                        </div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step 2: "Gottloser Scroller-Effekt" (4 Interactive 3D Mode Portals) -->
+            <div class="w-full relative">
+                <div class="flex items-center justify-between px-2 mb-1">
+                    <span class="font-cinzel font-bold text-xs uppercase tracking-widest text-amber-300">
+                        <i class="fa-solid fa-wand-sparkles mr-1.5"></i>Wähle deine Göttliche Bestimmung (3D-Parallax-Scroller)
+                    </span>
+                    <div class="flex items-center gap-1.5">
+                        <button onclick="scrollModeCards(-1)" class="god-btn w-7 h-7 rounded-lg bg-slate-900/90 border border-slate-700 text-amber-300 flex items-center justify-center text-xs" title="Nach links scrollen">
+                            <i class="fa-solid fa-chevron-left"></i>
+                        </button>
+                        <button onclick="scrollModeCards(1)" class="god-btn w-7 h-7 rounded-lg bg-slate-900/90 border border-slate-700 text-amber-300 flex items-center justify-center text-xs" title="Nach rechts scrollen">
+                            <i class="fa-solid fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="ungodly-scroller" class="ungodly-scroller-viewport flex items-stretch gap-5 w-full">
+                    
+                    <!-- CARD 1: SINGLEPLAYER (URSPRUNG DER ZIVILISATION) -->
+                    <div onmousemove="tiltCard3D(event, this)" onmouseleave="resetCard3D(this)" onclick="startGameSession('singleplayer')" class="ungodly-card min-w-[285px] sm:min-w-[320px] flex-1 rounded-3xl p-5 cursor-pointer group">
+                        <div class="ungodly-card-inner flex flex-col justify-between h-full">
+                            <div>
+                                <div class="flex items-center justify-between mb-3">
+                                    <span class="px-2.5 py-1 rounded-full bg-amber-500/20 border border-amber-400/50 text-amber-300 text-[10px] font-bold uppercase tracking-wider">
+                                        🔥 Hauptkampagne
+                                    </span>
+                                    <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center text-slate-950 text-lg shadow-lg">
+                                        <i class="fa-solid fa-bolt"></i>
+                                    </div>
+                                </div>
+                                <h2 class="font-cinzel font-black text-lg sm:text-xl text-amber-300 group-hover:text-amber-200 transition-colors">
+                                    SINGLEPLAYER
+                                </h2>
+                                <div class="text-[11px] font-bold text-cyan-300 uppercase tracking-wider mb-2">
+                                    Ursprung der Zivilisation
+                                </div>
+                                <p class="text-xs text-slate-300 leading-relaxed mb-4">
+                                    Starte im <b>Anfangszustand (Epoche I)</b> mit 5 Nomaden am heiligen Fluss. Manifestiere ihren <b>Glauben</b>, entwickle deine Stadt durch 4 Epochen, erlebe Jahreszeiten &amp; Kosmos-Katastrophen und unterwirf oder bekehre Wikinger, Japaner &amp; Azteken!
+                                </p>
+                            </div>
+                            <button class="god-btn w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-400 via-amber-500 to-orange-500 text-slate-950 font-cinzel font-black text-xs uppercase tracking-wider shadow-lg">
+                                Welt Erschaffen &amp; Starten →
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- CARD 2: MULTIPLAYER & DISCORD SERVER BRIDGE -->
+                    <div onmousemove="tiltCard3D(event, this)" onmouseleave="resetCard3D(this)" onclick="openStartSubModal('discord-modal')" class="ungodly-card min-w-[285px] sm:min-w-[320px] flex-1 rounded-3xl p-5 cursor-pointer group">
+                        <div class="ungodly-card-inner flex flex-col justify-between h-full">
+                            <div>
+                                <div class="flex items-center justify-between mb-3">
+                                    <span class="px-2.5 py-1 rounded-full bg-indigo-500/25 border border-indigo-400/50 text-indigo-300 text-[10px] font-bold uppercase tracking-wider">
+                                        <i class="fa-brands fa-discord mr-1"></i>Discord-Bridge
+                                    </span>
+                                    <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-lg shadow-lg">
+                                        <i class="fa-brands fa-discord"></i>
+                                    </div>
+                                </div>
+                                <h2 class="font-cinzel font-black text-lg sm:text-xl text-indigo-300 group-hover:text-indigo-200 transition-colors">
+                                    MULTIPLAYER
+                                </h2>
+                                <div class="text-[11px] font-bold text-purple-300 uppercase tracking-wider mb-2">
+                                    Discord-Pantheon &amp; Co-Op
+                                </div>
+                                <p class="text-xs text-slate-300 leading-relaxed mb-4">
+                                    Verbinde deinen <b>Discord-Server</b> per Server-ID, Invite-Link oder Webhook! Erstelle eine gemeinsame <b>Pantheon-Lobby</b>, teile den Raumcode mit deinen Freunden, schicke Live-Wunder und kämpft oder baut gemeinsam auf einer Insel!
+                                </p>
+                            </div>
+                            <button class="god-btn w-full py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white font-cinzel font-black text-xs uppercase tracking-wider shadow-lg">
+                                Discord-Lobby Öffnen →
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- CARD 3: TRAINING / TUTORIAL SESSION -->
+                    <div onmousemove="tiltCard3D(event, this)" onmouseleave="resetCard3D(this)" onclick="startGameSession('training')" class="ungodly-card min-w-[285px] sm:min-w-[320px] flex-1 rounded-3xl p-5 cursor-pointer group">
+                        <div class="ungodly-card-inner flex flex-col justify-between h-full">
+                            <div>
+                                <div class="flex items-center justify-between mb-3">
+                                    <span class="px-2.5 py-1 rounded-full bg-cyan-500/20 border border-cyan-400/50 text-cyan-300 text-[10px] font-bold uppercase tracking-wider">
+                                        🎓 Interaktives Tutorial
+                                    </span>
+                                    <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-cyan-400 to-sky-600 flex items-center justify-center text-slate-950 text-lg shadow-lg">
+                                        <i class="fa-solid fa-graduation-cap"></i>
+                                    </div>
+                                </div>
+                                <h2 class="font-cinzel font-black text-lg sm:text-xl text-cyan-300 group-hover:text-cyan-200 transition-colors">
+                                    TRAINING &amp; LEHRE
+                                </h2>
+                                <div class="text-[11px] font-bold text-emerald-300 uppercase tracking-wider mb-2">
+                                    6-Schritte Götter-Schule
+                                </div>
+                                <p class="text-xs text-slate-300 leading-relaxed mb-4">
+                                    Lerne Schritt für Schritt die Praktiken einer Gottheit: <b>Hand Gottes</b> (Greifen &amp; Werfen), <b>Glauben manifestieren</b> am Schrein, <b>Runen-Gesten</b> mit Rechtsklick zeichnen und das neuronale Gedächtnis deiner Kreatur formen.
+                                </p>
+                            </div>
+                            <button class="god-btn w-full py-2.5 rounded-xl bg-gradient-to-r from-cyan-400 to-emerald-500 text-slate-950 font-cinzel font-black text-xs uppercase tracking-wider shadow-lg">
+                                Trainings-Session Starten →
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- CARD 4: SETTINGS & ENGINE TUNING -->
+                    <div onmousemove="tiltCard3D(event, this)" onmouseleave="resetCard3D(this)" onclick="openStartSubModal('settings-modal')" class="ungodly-card min-w-[285px] sm:min-w-[320px] flex-1 rounded-3xl p-5 cursor-pointer group">
+                        <div class="ungodly-card-inner flex flex-col justify-between h-full">
+                            <div>
+                                <div class="flex items-center justify-between mb-3">
+                                    <span class="px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/50 text-emerald-300 text-[10px] font-bold uppercase tracking-wider">
+                                        ⚙️ System &amp; Grafik
+                                    </span>
+                                    <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center text-slate-950 text-lg shadow-lg">
+                                        <i class="fa-solid fa-sliders"></i>
+                                    </div>
+                                </div>
+                                <h2 class="font-cinzel font-black text-lg sm:text-xl text-emerald-300 group-hover:text-emerald-200 transition-colors">
+                                    SETTINGS
+                                </h2>
+                                <div class="text-[11px] font-bold text-amber-300 uppercase tracking-wider mb-2">
+                                    Grafik, Blitz-Cursor &amp; Kosmos
+                                </div>
+                                <p class="text-xs text-slate-300 leading-relaxed mb-4">
+                                    Passe <b>WebGL-Schattenqualität</b>, <b>Maus-Blitz-Intensität</b>, Web-Audio-Synthesizer, Kamera-Empfindlichkeit sowie die Häufigkeit von Wetterwechseln und kosmischen Katastrophen individuell an.
+                                </p>
+                            </div>
+                            <button class="god-btn w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-emerald-400/50 text-emerald-300 font-cinzel font-bold text-xs uppercase tracking-wider shadow-lg">
+                                Einstellungen Konfigurieren →
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Hint Footer on Start Screen -->
+        <div class="w-full max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400 z-10 border-t border-slate-800/80 pt-2.5">
+            <div>
+                <i class="fa-solid fa-bolt text-amber-400 mr-1"></i>
+                <b>Interaktiver Blitz-Cursor:</b> Bewege deine Maus oder klicke, um göttliche Lichtbögen zu entladen (Links = Dunkle Macht, Rechts = Himmlisches Licht).
+            </div>
+            <div class="font-cinzel text-amber-300/80">
+                Black &amp; White Ultra • GitHub Ready Single-File WebGL Engine
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- IN-GAME TOP HUD BAR: FAITH, RESOURCES, ALIGNMENT, TIME & CAMERA       -->
+    <!-- ===================================================================== -->
+    <header class="fixed top-2 left-2 right-2 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+        
+        <!-- Left: Brand, Era & Resource Counters -->
+        <div class="god-panel rounded-2xl px-3 py-2 flex flex-wrap items-center gap-2.5 pointer-events-auto">
+            <button onclick="returnToStartScreen()" class="god-btn flex items-center gap-2 pr-2.5 border-r border-slate-700/80 text-left" title="Zurück zum Hauptmenü / Startbildschirm">
+                <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-300 via-amber-500 to-rose-600 flex items-center justify-center shadow-lg">
+                    <i class="fa-solid fa-hand-sparkles text-slate-950 text-sm"></i>
+                </div>
+                <div>
+                    <div class="font-cinzel font-bold text-xs sm:text-sm tracking-wider text-amber-300 leading-none">B&amp;W ULTRA</div>
+                    <span id="hud-era-subtitle" class="text-[10px] font-semibold tracking-widest text-cyan-300 uppercase">EPOCHE I • NOMADEN</span>
+                </div>
+            </button>
+
+            <!-- Resource Badges -->
+            <div class="flex flex-wrap items-center gap-1.5 text-xs">
+                <div class="flex items-center gap-1.5 bg-slate-900/85 px-2 py-1 rounded-lg border border-cyan-500/40" title="Manifestierter Glaube (Schaltet die 4 Zivilisations-Epochen frei)">
+                    <i class="fa-solid fa-hands-praying text-cyan-300"></i>
+                    <span class="text-slate-400 hidden xl:inline">Glaube:</span>
+                    <span id="res-faith" class="font-bold text-cyan-200">15</span>
+                    <span id="res-faith-next" class="text-[10px] text-slate-400">/ 100</span>
+                </div>
+                <div class="flex items-center gap-1.5 bg-slate-900/85 px-2 py-1 rounded-lg border border-emerald-500/30" title="Holz im Lagerhaus">
+                    <i class="fa-solid fa-tree text-emerald-400"></i>
+                    <span id="res-wood" class="font-bold text-emerald-300">90</span>
+                </div>
+                <div class="flex items-center gap-1.5 bg-slate-900/85 px-2 py-1 rounded-lg border border-amber-500/30" title="Getreide / Nahrung">
+                    <i class="fa-solid fa-wheat-awn text-amber-400"></i>
+                    <span id="res-grain" class="font-bold text-amber-300">90</span>
+                </div>
+                <div class="flex items-center gap-1.5 bg-slate-900/85 px-2 py-1 rounded-lg border border-sky-500/30" title="Erz im Lagerhaus">
+                    <i class="fa-solid fa-gem text-sky-400"></i>
+                    <span id="res-ore" class="font-bold text-sky-300">50</span>
+                </div>
+                <div class="flex items-center gap-1.5 bg-slate-900/85 px-2 py-1 rounded-lg border border-purple-500/40" title="Göttliches Mana für Wunder">
+                    <i class="fa-solid fa-wand-magic-sparkles text-purple-400"></i>
+                    <span id="res-mana" class="font-bold text-purple-300">80</span>
+                </div>
+                <div class="flex items-center gap-1.5 bg-slate-900/85 px-2 py-1 rounded-lg border border-yellow-500/40" title="Eindruckswert deiner Stadt">
+                    <i class="fa-solid fa-crown text-yellow-400"></i>
+                    <span id="res-impress" class="font-bold text-yellow-300">35</span>
+                </div>
+                <div class="flex items-center gap-1.5 bg-slate-900/85 px-2 py-1 rounded-lg border border-cyan-500/30" title="Bevölkerung / Wohnraum">
+                    <i class="fa-solid fa-users text-cyan-400"></i>
+                    <span id="res-pop" class="font-bold text-cyan-300">5 / 10</span>
+                </div>
+                <button onclick="toggleModal('tribute-modal')" class="god-btn flex items-center gap-1 bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 font-bold px-2.5 py-1 rounded-lg shadow" title="Tribut-Kammer öffnen">
+                    <i class="fa-solid fa-coins"></i>
+                    <span id="res-tribute">100</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Center: Alignment Bar + World Clock, Seasons & Cosmic Button -->
+        <div class="god-panel rounded-2xl px-3.5 py-1.5 flex flex-wrap items-center gap-3 pointer-events-auto">
+            <div class="flex items-center gap-2 min-w-[175px] sm:min-w-[205px]">
+                <i class="fa-solid fa-skull-crossbones text-rose-400 text-xs" title="Böse (-100)"></i>
+                <div class="flex-1 flex flex-col gap-0.5">
+                    <div class="flex justify-between text-[10px] font-semibold">
+                        <span id="alignment-label" class="text-amber-300">Ausgeglichen (0)</span>
+                        <span id="conquered-counter" class="text-emerald-300">Stämme: 0/3</span>
+                    </div>
+                    <div class="relative w-full h-2 rounded-full bg-gradient-to-r from-rose-700 via-slate-600 to-sky-400 p-0.5 overflow-hidden">
+                        <div id="alignment-marker" class="absolute top-0 bottom-0 w-2 bg-white rounded-full shadow-[0_0_8px_#fff] transition-all duration-300" style="left: calc(50% - 4px);"></div>
+                    </div>
+                </div>
+                <i class="fa-solid fa-dove text-sky-300 text-xs" title="Gut (+100)"></i>
+            </div>
+
+            <div class="h-7 w-[1px] bg-slate-700/80 hidden sm:block"></div>
+
+            <!-- World Clock & Weather -->
+            <div class="flex items-center gap-1.5 text-xs">
+                <div class="bg-slate-900/90 px-2.5 py-1 rounded-xl border border-slate-700/80 flex items-center gap-2">
+                    <span id="hud-time-icon" class="text-sm">☀️</span>
+                    <div class="leading-tight">
+                        <div class="font-bold text-[11px] text-amber-200">
+                            <span id="hud-year-text">Jahr 1</span> • <span id="hud-season-text">🌸 Frühling</span>
+                        </div>
+                        <div class="text-[10px] text-slate-400 flex items-center gap-1">
+                            <span id="hud-clock-text">09:30 Uhr</span> • <span id="hud-weather-text" class="text-sky-300">Klar</span>
+                        </div>
+                    </div>
+                </div>
+                <button onclick="cycleTimeSpeed()" id="btn-time-speed" class="god-btn px-2 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-[11px] font-bold text-amber-300" title="Zeitgeschwindigkeit (1x / 2x / 4x)">
+                    ⏩ 1x
+                </button>
+                <button onclick="triggerRandomCosmicOrDisaster()" class="god-btn px-2 py-1.5 rounded-xl bg-purple-950/85 hover:bg-purple-800/85 border border-purple-500/40 text-[11px] font-bold text-purple-200" title="Kosmisches Ereignis oder Katastrophe auslösen">
+                    ☄️ Kosmos
+                </button>
+            </div>
+        </div>
+
+        <!-- Right: Camera Jump, Discord Status, Audio & Settings -->
+        <div class="god-panel rounded-2xl px-2.5 py-1.5 flex items-center gap-1.5 pointer-events-auto text-xs">
+            <button onclick="focusCameraOn('greek')" class="god-btn px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300" title="Kamera zur Siedlung">
+                <i class="fa-solid fa-landmark"></i>
+            </button>
+            <button onclick="focusCameraOn('creature')" class="god-btn px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-purple-300" title="Kamera zur Kreatur">
+                <i class="fa-solid fa-paw"></i>
+            </button>
+            <button onclick="focusCameraOn('vikings')" class="god-btn px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300" title="Nord-Insel: Wikinger">
+                <i class="fa-solid fa-shield-halved"></i>
+            </button>
+            <button onclick="focusCameraOn('japanese')" class="god-btn px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-300" title="Ost-Plateau: Japaner">
+                <i class="fa-solid fa-torii-gate"></i>
+            </button>
+            <button onclick="focusCameraOn('aztecs')" class="god-btn px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-rose-400" title="Süd-Vulkan: Azteken">
+                <i class="fa-solid fa-volcano"></i>
+            </button>
+            <div class="h-4 w-[1px] bg-slate-700 mx-0.5"></div>
+            <button onclick="toggleModal('discord-modal')" class="god-btn w-8 h-8 rounded-lg bg-indigo-950/90 hover:bg-indigo-800 border border-indigo-400/40 text-indigo-300 flex items-center justify-center" title="Discord-Multiplayer & Server-Bridge">
+                <i class="fa-brands fa-discord"></i>
+            </button>
+            <button id="btn-audio" onclick="toggleAudio()" class="god-btn w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center justify-center" title="Audio An/Aus">
+                <i class="fa-solid fa-volume-high"></i>
+            </button>
+            <button onclick="toggleModal('settings-modal')" class="god-btn w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 flex items-center justify-center" title="Einstellungen">
+                <i class="fa-solid fa-sliders"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- ===================================================================== -->
+    <!-- COSMIC EVENT / ERA ADVANCEMENT BANNER                                 -->
+    <!-- ===================================================================== -->
+    <div id="cosmic-event-banner" class="fixed top-16 left-1/2 -translate-x-1/2 z-30 pointer-events-none hidden">
+        <div class="god-panel-gold rounded-2xl px-5 py-2.5 border-2 border-purple-400/70 shadow-[0_0_35px_rgba(168,85,247,0.5)] flex items-center gap-3 cosmic-banner-enter">
+            <span id="cosmic-event-icon" class="text-2xl">☄️</span>
+            <div>
+                <div id="cosmic-event-title" class="font-cinzel font-bold text-xs sm:text-sm text-amber-300 uppercase tracking-wider">KOSMISCHES EREIGNIS</div>
+                <div id="cosmic-event-desc" class="text-[11px] text-slate-200">Ein Sternschnuppenschauer erleuchtet die Insel!</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- INTERACTIVE TRAINING SESSION OVERLAY                                  -->
+    <!-- ===================================================================== -->
+    <div id="tutorial-overlay" class="fixed top-20 left-1/2 -translate-x-1/2 z-30 w-[94vw] max-w-xl pointer-events-auto hidden">
+        <div class="god-panel-gold rounded-2xl p-4 border-2 border-cyan-400/60 shadow-[0_0_30px_rgba(56,189,248,0.3)]">
+            <div class="flex items-center justify-between border-b border-slate-700/80 pb-2 mb-2">
+                <div class="flex items-center gap-2">
+                    <span class="px-2 py-0.5 rounded-md bg-cyan-500/20 border border-cyan-400/40 text-cyan-300 font-bold text-[10px] uppercase tracking-wider">
+                        🎓 Götter-Training • <span id="tut-step-counter">Schritt 1 / 6</span>
+                    </span>
+                    <h3 id="tut-step-title" class="font-cinzel font-bold text-sm text-amber-300">Die Göttliche Perspektive</h3>
+                </div>
+                <button onclick="endTutorialSession(false)" class="text-[11px] text-slate-400 hover:text-white px-2 py-0.5 rounded bg-slate-800/80">
+                    Beenden ✕
+                </button>
+            </div>
+            <p id="tut-step-desc" class="text-xs text-slate-200 leading-relaxed mb-3">
+                Bewege deine Sicht mit <b>W, A, S, D</b> über das Flusstal und drehe die Perspektive mit <b>Q / E</b> oder gedrücktem Mausrad.
+            </p>
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2 text-[11px] text-emerald-300 font-medium" id="tut-step-task">
+                    <i class="fa-solid fa-circle-notch fa-spin"></i>
+                    <span>Aufgabe: Bewege oder drehe einmal die Kamera...</span>
+                </div>
+                <button onclick="advanceTutorialStep()" class="god-btn px-3 py-1 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/40 text-cyan-200 text-xs font-semibold">
+                    Nächster Schritt →
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- CONSCIENCE ADVISORS: ENGEL (LEFT) & TEUFEL (RIGHT)                    -->
+    <!-- ===================================================================== -->
+    <div id="advisor-angel" class="fixed top-20 left-4 z-20 max-w-xs god-panel rounded-2xl p-3 border-l-4 border-l-sky-400 pointer-events-none opacity-0 -translate-x-4 transition-all duration-300">
+        <div class="flex items-start gap-2.5">
+            <div class="w-8 h-8 rounded-full bg-sky-500/20 border border-sky-400/50 flex items-center justify-center shrink-0 text-sky-300">
+                <i class="fa-solid fa-dove"></i>
+            </div>
+            <div>
+                <div class="text-[10px] font-bold uppercase tracking-wider text-sky-300">Gutes Gewissen • Licht</div>
+                <p id="advisor-angel-text" class="text-xs text-slate-200 mt-0.5 leading-snug">
+                    „Manifestiere den Glauben deiner Nomaden durch Güte, Wunder und blühende Gärten!“
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div id="advisor-devil" class="fixed top-20 right-4 z-20 max-w-xs god-panel rounded-2xl p-3 border-r-4 border-r-rose-500 pointer-events-none opacity-0 translate-x-4 transition-all duration-300">
+        <div class="flex items-start gap-2.5">
+            <div class="w-8 h-8 rounded-full bg-rose-500/20 border border-rose-500/50 flex items-center justify-center shrink-0 text-rose-400">
+                <i class="fa-solid fa-fire-flame-curved"></i>
+            </div>
+            <div>
+                <div class="text-[10px] font-bold uppercase tracking-wider text-rose-400">Böses Gewissen • Krieg</div>
+                <p id="advisor-devil-text" class="text-xs text-slate-200 mt-0.5 leading-snug">
+                    „Opfere am Altar für gewaltiges Mana und zerschmettere die Nachbarstämme mit Vulkanen!“
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- LEFT SIDEBAR: CREATURE AVATAR & REINFORCEMENT LEARNING                -->
+    <!-- ===================================================================== -->
+    <aside class="fixed left-2.5 top-1/2 -translate-y-1/2 z-20 w-64 flex flex-col gap-2.5 pointer-events-none hidden md:flex">
+        <div class="god-panel rounded-2xl p-3 pointer-events-auto">
+            <div class="flex items-center justify-between border-b border-slate-700/80 pb-2 mb-2">
+                <div class="flex items-center gap-2">
+                    <div id="creature-avatar-badge" class="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500/30 to-purple-600/30 border border-amber-400/50 flex items-center justify-center text-lg">
+                        🦁
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-1.5">
+                            <h2 id="creature-name-display" class="font-cinzel font-bold text-xs text-amber-300">Titanen-Löwe</h2>
+                            <span id="creature-lvl-badge" class="text-[10px] px-1.5 py-0.2 bg-amber-500/20 text-amber-300 rounded font-bold">Lv.1</span>
+                        </div>
+                        <p id="creature-align-tag" class="text-[10px] text-slate-400">Neutraler Avatar</p>
+                    </div>
+                </div>
+                <button onclick="toggleModal('creature-modal')" class="god-btn px-2 py-1 rounded-lg bg-purple-500/20 border border-purple-400/40 text-purple-200 text-[11px] font-semibold" title="Neuronales KI-Gehirn öffnen">
+                    <i class="fa-solid fa-brain mr-1"></i>KI
+                </button>
+            </div>
+
+            <!-- Creature Vitals -->
+            <div class="space-y-1.5 text-[11px] mb-2.5">
+                <div>
+                    <div class="flex justify-between text-slate-300 mb-0.5">
+                        <span>Lebenskraft</span>
+                        <span id="creature-hp-text" class="text-emerald-300 font-semibold">100%</span>
+                    </div>
+                    <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                        <div id="creature-hp-bar" class="h-full bg-emerald-400 transition-all duration-300" style="width: 100%;"></div>
+                    </div>
+                </div>
+                <div>
+                    <div class="flex justify-between text-slate-300 mb-0.5">
+                        <span>Sättigung</span>
+                        <span id="creature-hunger-text" class="text-amber-300 font-semibold">88%</span>
+                    </div>
+                    <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                        <div id="creature-hunger-bar" class="h-full bg-amber-400 transition-all duration-300" style="width: 88%;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Live Thought Bubble -->
+            <div class="bg-slate-900/90 border border-slate-700/80 rounded-xl p-2 mb-2.5">
+                <div class="text-[10px] text-slate-400 uppercase font-semibold">Aktueller Gedanke:</div>
+                <div class="text-xs text-amber-200 font-medium flex items-center gap-1.5 mt-0.5">
+                    <i class="fa-solid fa-comment-dots text-amber-400"></i>
+                    <span id="creature-thought-text" class="truncate">Erkundet das junge Nomadenlager</span>
+                </div>
+            </div>
+
+            <!-- 5 Creature Modes -->
+            <div class="text-[10px] text-slate-400 uppercase font-semibold mb-1">Kreaturen-Rolle (BW2):</div>
+            <div class="grid grid-cols-5 gap-1 mb-2.5">
+                <button onclick="setCreatureRole('free')" id="role-btn-free" class="god-btn p-1.5 rounded-lg bg-amber-500/20 border border-amber-400/50 text-center text-[10px] flex flex-col items-center gap-0.5" title="Freier Wille">
+                    <i class="fa-solid fa-compass text-amber-300"></i><span>Frei</span>
+                </button>
+                <button onclick="setCreatureRole('gatherer')" id="role-btn-gatherer" class="god-btn p-1.5 rounded-lg bg-slate-800/80 border border-slate-700 text-center text-[10px] flex flex-col items-center gap-0.5" title="Sammler">
+                    <i class="fa-solid fa-truck-ramp-box text-emerald-400"></i><span>Sammler</span>
+                </button>
+                <button onclick="setCreatureRole('builder')" id="role-btn-builder" class="god-btn p-1.5 rounded-lg bg-slate-800/80 border border-slate-700 text-center text-[10px] flex flex-col items-center gap-0.5" title="Baumeister">
+                    <i class="fa-solid fa-hammer text-sky-400"></i><span>Bauer</span>
+                </button>
+                <button onclick="setCreatureRole('entertainer')" id="role-btn-entertainer" class="god-btn p-1.5 rounded-lg bg-slate-800/80 border border-slate-700 text-center text-[10px] flex flex-col items-center gap-0.5" title="Entertainer">
+                    <i class="fa-solid fa-masks-theater text-pink-400"></i><span>Tanz</span>
+                </button>
+                <button onclick="setCreatureRole('soldier')" id="role-btn-soldier" class="god-btn p-1.5 rounded-lg bg-slate-800/80 border border-slate-700 text-center text-[10px] flex flex-col items-center gap-0.5" title="Soldat">
+                    <i class="fa-solid fa-khanda text-rose-400"></i><span>Krieger</span>
+                </button>
+            </div>
+
+            <!-- Reinforcement Learning Feedback Buttons -->
+            <div class="grid grid-cols-3 gap-1.5">
+                <button onclick="reinforceCreature(true)" class="god-btn py-1.5 px-2 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 text-[11px] font-semibold flex items-center justify-center gap-1">
+                    <span>👏</span><span>Loben</span>
+                </button>
+                <button onclick="feedCreatureDirectly()" class="god-btn py-1.5 px-2 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-[11px] font-semibold flex items-center justify-center gap-1">
+                    <span>🍖</span><span>Füttern</span>
+                </button>
+                <button onclick="reinforceCreature(false)" class="god-btn py-1.5 px-2 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 text-[11px] font-semibold flex items-center justify-center gap-1">
+                    <span>⚡</span><span>Strafen</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Held Object Status Card -->
+        <div class="god-panel rounded-2xl p-3 pointer-events-auto">
+            <div class="flex items-center justify-between">
+                <span class="text-[11px] font-cinzel font-bold text-amber-300 uppercase tracking-wider">
+                    <i class="fa-solid fa-hand-back-fist mr-1"></i>Hand Gottes
+                </span>
+                <span id="hand-mode-badge" class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold">
+                    Greifen &amp; Werfen
+                </span>
+            </div>
+            <div id="held-object-info" class="mt-1.5 text-xs text-slate-300 bg-slate-900/90 rounded-lg p-2 border border-slate-800">
+                Hand ist leer. <b>Linksklick</b> auf Bewohner, Baum oder Erz zum Greifen.
+            </div>
+        </div>
+    </aside>
+
+    <!-- ===================================================================== -->
+    <!-- RIGHT SIDEBAR: TRIBES, DISCORD PANTHEON LIVE WIDGET & QUEST SCROLLS   -->
+    <!-- ===================================================================== -->
+    <aside class="fixed right-2.5 top-1/2 -translate-y-1/2 z-20 w-64 flex flex-col gap-2.5 pointer-events-none hidden lg:flex">
+        
+        <!-- Live Discord Pantheon Multiplayer Box -->
+        <div class="god-panel rounded-2xl p-3 pointer-events-auto border-indigo-500/40">
+            <div class="flex items-center justify-between border-b border-slate-700/80 pb-1.5 mb-2">
+                <span class="font-cinzel font-bold text-xs text-indigo-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <i class="fa-brands fa-discord text-indigo-400"></i>Discord Pantheon
+                </span>
+                <button onclick="toggleModal('discord-modal')" class="text-[10px] px-2 py-0.5 rounded bg-indigo-500/25 text-indigo-200 border border-indigo-400/40 hover:bg-indigo-500/40">
+                    Lobby
+                </button>
+            </div>
+            <div id="hud-discord-members" class="space-y-1.5 text-[11px] mb-2">
+                <div class="flex items-center justify-between bg-slate-900/80 px-2 py-1 rounded-lg">
+                    <span class="text-emerald-300 font-semibold">🟢 Du (Host-Gottheit)</span>
+                    <span class="text-[10px] text-slate-400">Epoche I</span>
+                </div>
+            </div>
+            <div class="flex gap-1.5">
+                <button onclick="sendQuickMultiplayerBlessing()" class="god-btn flex-1 py-1 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/35 border border-indigo-400/40 text-indigo-200 text-[10px] font-semibold">
+                    ⚡ Co-Op Segen
+                </button>
+                <button onclick="toggleModal('discord-modal')" class="god-btn flex-1 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-[10px] font-semibold">
+                    🔗 Einladen
+                </button>
+            </div>
+        </div>
+
+        <!-- Tribes Conquest Status -->
+        <div class="god-panel rounded-2xl p-3 pointer-events-auto">
+            <div class="flex items-center justify-between border-b border-slate-700/80 pb-1.5 mb-2">
+                <span class="font-cinzel font-bold text-xs text-amber-300 uppercase tracking-wider">
+                    <i class="fa-solid fa-globe mr-1"></i>Stämme der Insel
+                </span>
+                <span class="text-[10px] text-slate-400">Eindruck / Krieg</span>
+            </div>
+            <div id="tribes-status-list" class="space-y-2 text-xs"></div>
+
+            <div class="mt-2.5 pt-2 border-t border-slate-800 flex items-center justify-between gap-1">
+                <button onclick="recruitPlatoon()" class="god-btn flex-1 py-1.5 px-2 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-200 text-[11px] font-semibold">
+                    <i class="fa-solid fa-shield-halved mr-1"></i>Phalanx (60🌾 40💎)
+                </button>
+                <button onclick="commandAllPlatoonsAttack()" class="god-btn py-1.5 px-2.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 text-[11px] font-semibold" title="Alle Regimenter zum Angriff senden">
+                    ⚔️ (<span id="platoon-count">0</span>)
+                </button>
+            </div>
+        </div>
+
+        <!-- Silver & Gold Scrolls -->
+        <div class="god-panel rounded-2xl p-3 pointer-events-auto">
+            <div class="flex items-center justify-between border-b border-slate-700/80 pb-1.5 mb-2">
+                <span class="font-cinzel font-bold text-xs text-amber-300 uppercase tracking-wider">
+                    <i class="fa-solid fa-scroll mr-1"></i>Schriftrollen
+                </span>
+                <span class="text-[10px] text-amber-400">+Tribut &amp; Glaube</span>
+            </div>
+            <div id="scrolls-list" class="space-y-1.5 max-h-36 overflow-y-auto pr-1"></div>
+        </div>
+    </aside>
+
+    <!-- ===================================================================== -->
+    <!-- BOTTOM DOCK: HAND OF GOD, BUILDINGS & GESTURE MIRACLES                -->
+    <!-- ===================================================================== -->
+    <footer class="fixed bottom-2.5 left-1/2 -translate-x-1/2 z-20 w-[96vw] max-w-5xl pointer-events-none">
+        <div class="god-panel rounded-2xl px-3 py-2 pointer-events-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+            
+            <!-- Left: Primary Hand Mode -->
+            <div class="flex items-center gap-1.5 border-b sm:border-b-0 sm:border-r border-slate-700/80 pb-1.5 sm:pb-0 sm:pr-2.5">
+                <button onclick="setInteractionMode('hand')" id="mode-btn-hand" class="god-btn px-3 py-2 rounded-xl bg-amber-500/25 border border-amber-400 text-amber-200 text-xs font-semibold flex items-center gap-1.5">
+                    <i class="fa-solid fa-hand-sparkles text-base"></i>
+                    <div class="text-left leading-tight">
+                        <div>Hand Gottes</div>
+                        <div class="text-[9px] text-amber-300/80">Greifen / Werfen</div>
+                    </div>
+                </button>
+            </div>
+
+            <!-- Center: Settlement Buildings -->
+            <div class="flex items-center gap-1.5 overflow-x-auto max-w-full py-0.5">
+                <span class="text-[10px] font-cinzel text-slate-400 uppercase tracking-wider hidden xl:inline mr-1">Bauen:</span>
+                <button onclick="selectBuildType('house')" id="build-btn-house" class="god-btn px-2.5 py-1.5 rounded-xl bg-slate-800/90 border border-slate-700 text-xs flex flex-col items-center min-w-[66px]" title="Griechisches Wohnhaus (+5 Wohnraum, +15 Eindruck)">
+                    <span class="text-sm">🏛️</span>
+                    <span class="font-semibold text-[11px] text-slate-200">Haus</span>
+                    <span class="text-[9px] text-emerald-400">35🌲</span>
+                </button>
+                <button onclick="selectBuildType('farm')" id="build-btn-farm" class="god-btn px-2.5 py-1.5 rounded-xl bg-slate-800/90 border border-slate-700 text-xs flex flex-col items-center min-w-[66px]" title="Getreidefeld (+Nahrung)">
+                    <span class="text-sm">🌾</span>
+                    <span class="font-semibold text-[11px] text-slate-200">Feld</span>
+                    <span class="text-[9px] text-emerald-400">25🌲</span>
+                </button>
+                <button onclick="selectBuildType('storehouse')" id="build-btn-storehouse" class="god-btn px-2.5 py-1.5 rounded-xl bg-slate-800/90 border border-slate-700 text-xs flex flex-col items-center min-w-[66px]" title="Lagerhaus (Sammelpunkt)">
+                    <span class="text-sm">🏺</span>
+                    <span class="font-semibold text-[11px] text-slate-200">Lager</span>
+                    <span class="text-[9px] text-emerald-400">45🌲 15💎</span>
+                </button>
+                <button onclick="selectBuildType('barracks')" id="build-btn-barracks" class="god-btn px-2.5 py-1.5 rounded-xl bg-slate-800/90 border border-slate-700 text-xs flex flex-col items-center min-w-[66px]" title="Kaserne (Truppen & +Böse)">
+                    <span class="text-sm">⚔️</span>
+                    <span class="font-semibold text-[11px] text-slate-200">Kaserne</span>
+                    <span class="text-[9px] text-sky-300">50🌲 40💎</span>
+                </button>
+                <button onclick="selectBuildType('garden')" id="build-btn-garden" class="god-btn px-2.5 py-1.5 rounded-xl bg-slate-800/90 border border-sky-500/30 text-xs flex flex-col items-center min-w-[66px]" title="Elysischer Brunnen (+Gut & +45 Eindruck)">
+                    <span class="text-sm">⛲</span>
+                    <span class="font-semibold text-[11px] text-sky-200">Brunnen</span>
+                    <span class="text-[9px] text-sky-300">30🌲 10💎</span>
+                </button>
+                <button onclick="selectBuildType('spikes')" id="build-btn-spikes" class="god-btn px-2.5 py-1.5 rounded-xl bg-slate-800/90 border border-rose-500/30 text-xs flex flex-col items-center min-w-[66px]" title="Foltergrube (+Böse & Einschüchterung)">
+                    <span class="text-sm">🩸</span>
+                    <span class="font-semibold text-[11px] text-rose-200">Dornen</span>
+                    <span class="text-[9px] text-rose-300">20🌲 30💎</span>
+                </button>
+                <button onclick="selectBuildType('obelisk')" id="build-btn-obelisk" class="god-btn px-2.5 py-1.5 rounded-xl bg-slate-800/90 border border-amber-500/30 text-xs flex flex-col items-center min-w-[66px]" title="Sonnen-Obelisk (+90 Eindruck & Mana)">
+                    <span class="text-sm">🔱</span>
+                    <span class="font-semibold text-[11px] text-amber-200">Obelisk</span>
+                    <span class="text-[9px] text-amber-300">60🌲 60💎</span>
+                </button>
+            </div>
+
+            <!-- Right: Gesture Miracles -->
+            <div class="flex items-center gap-1.5 border-t sm:border-t-0 sm:border-l border-slate-700/80 pt-1.5 sm:pt-0 sm:pl-2.5">
+                <button onclick="selectMiracleType('water')" id="miracle-btn-water" class="god-btn px-2 py-1.5 rounded-xl bg-sky-950/80 border border-sky-500/40 text-xs flex flex-col items-center min-w-[54px]" title="Wasser-Wunder (Taste 1 | Geste: Spirale)">
+                    <span class="text-sm">🌧️</span>
+                    <span class="text-[10px] font-semibold text-sky-200">Regen</span>
+                    <span class="text-[9px] text-purple-300">35✨</span>
+                </button>
+                <button onclick="selectMiracleType('heal')" id="miracle-btn-heal" class="god-btn px-2 py-1.5 rounded-xl bg-emerald-950/80 border border-emerald-500/40 text-xs flex flex-col items-center min-w-[54px]" title="Heilungs-Wunder (Taste 2 | Geste: Kreuz)">
+                    <span class="text-sm">💚</span>
+                    <span class="text-[10px] font-semibold text-emerald-200">Heilung</span>
+                    <span class="text-[9px] text-purple-300">45✨</span>
+                </button>
+                <button onclick="selectMiracleType('fireball')" id="miracle-btn-fireball" class="god-btn px-2 py-1.5 rounded-xl bg-orange-950/80 border border-orange-500/40 text-xs flex flex-col items-center min-w-[54px]" title="Feuerball (Taste 3 | Geste: Kreis)">
+                    <span class="text-sm">☄️</span>
+                    <span class="text-[10px] font-semibold text-orange-200">Feuer</span>
+                    <span class="text-[9px] text-purple-300">55✨</span>
+                </button>
+                <button onclick="selectMiracleType('lightning')" id="miracle-btn-lightning" class="god-btn px-2 py-1.5 rounded-xl bg-yellow-950/80 border border-yellow-500/40 text-xs flex flex-col items-center min-w-[54px]" title="Blitzschlag (Taste 4 | Geste: Zick-Zack)">
+                    <span class="text-sm">⚡</span>
+                    <span class="text-[10px] font-semibold text-yellow-200">Blitz</span>
+                    <span class="text-[9px] text-purple-300">70✨</span>
+                </button>
+                <button onclick="selectMiracleType('volcano')" id="miracle-btn-volcano" class="god-btn px-2 py-1.5 rounded-xl bg-rose-950/90 border border-rose-500/60 text-xs flex flex-col items-center min-w-[58px]" title="Epischer Vulkan (Taste 5 | Geste: Dreieck △)">
+                    <span class="text-sm">🌋</span>
+                    <span class="text-[10px] font-bold text-rose-200">Vulkan</span>
+                    <span class="text-[9px] text-purple-300">150✨</span>
+                </button>
+            </div>
+        </div>
+    </footer>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL 1: DISCORD MULTIPLAYER & PANTHEON SERVER BRIDGE                 -->
+    <!-- ===================================================================== -->
+    <div id="discord-modal" class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md hidden items-center justify-center p-4">
+        <div class="god-panel-gold rounded-3xl max-w-2xl w-full p-6 border border-indigo-400/50 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b border-slate-700 pb-3 mb-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-11 h-11 rounded-2xl bg-indigo-600/30 border border-indigo-400/50 flex items-center justify-center text-2xl text-indigo-300">
+                        <i class="fa-brands fa-discord"></i>
+                    </div>
+                    <div>
+                        <h2 class="font-cinzel font-bold text-lg text-indigo-300">DISCORD-PANTHEON &amp; MULTIPLAYER</h2>
+                        <p class="text-xs text-slate-400">Verbinde deinen Discord-Server und spiele mit deinen Freunden in Echtzeit</p>
+                    </div>
+                </div>
+                <button onclick="toggleModal('discord-modal')" class="god-btn w-8 h-8 rounded-lg bg-slate-800 text-slate-300 hover:text-white">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5 text-xs">
+                <!-- Server Connection Config -->
+                <div class="bg-slate-900/90 p-4 rounded-2xl border border-slate-800 space-y-3">
+                    <div class="font-bold text-indigo-300 uppercase tracking-wider">1. Discord-Server Verknüpfen</div>
+                    <div>
+                        <label class="block text-slate-400 mb-1">Dein Götter-Name (Discord-Tag):</label>
+                        <input id="discord-username-input" type="text" value="OlympusGod#0001" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 focus:border-indigo-400 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 mb-1">Discord Server-ID oder Invite-Link:</label>
+                        <input id="discord-server-input" type="text" placeholder="z.B. discord.gg/blackwhite-ultra" value="discord.gg/bw-ultra-pantheon" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 focus:border-indigo-400 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 mb-1">Optional: Discord-Channel Webhook-URL (für Live-Spielberichte im Server):</label>
+                        <input id="discord-webhook-input" type="text" placeholder="https://discord.com/api/webhooks/..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 focus:border-indigo-400 outline-none">
+                    </div>
+                    <div class="flex gap-2 pt-1">
+                        <button onclick="connectDiscordServer()" class="god-btn flex-1 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold">
+                            <i class="fa-brands fa-discord mr-1"></i>Server Verbinden
+                        </button>
+                        <button onclick="sendDiscordWebhookTest()" class="god-btn px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-indigo-400/40 text-indigo-200 font-semibold" title="Sendet eine echte Nachricht an deinen Discord-Webhook oder kopiert die Einladung">
+                            📡 Webhook-Ping
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Active Pantheon Lobby & Friends -->
+                <div class="bg-slate-900/90 p-4 rounded-2xl border border-slate-800 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="font-bold text-purple-300 uppercase tracking-wider">2. Pantheon Raum-Lobby</span>
+                            <span id="lobby-code-badge" class="px-2 py-0.5 rounded bg-purple-500/20 border border-purple-400/40 text-purple-200 font-mono font-bold">BWU-7749</span>
+                        </div>
+                        <p class="text-slate-400 text-[11px] mb-3">
+                            Teile diesen Lobby-Code in deinem Discord-Textkanal oder füge verbündete/rivalisierende Götter deiner Sitzung hinzu:
+                        </p>
+                        <div id="modal-discord-party-list" class="space-y-2 mb-3"></div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <div class="flex gap-2">
+                            <button onclick="simulateFriendJoinDiscord()" class="god-btn flex-1 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/40 text-emerald-200 font-semibold">
+                                <i class="fa-solid fa-user-plus mr-1"></i>Discord-Freund beitreten lassen
+                            </button>
+                            <button onclick="copyDiscordInviteLink()" class="god-btn px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-amber-300 font-semibold" title="Einladung in Zwischenablage kopieren">
+                                <i class="fa-solid fa-copy"></i>
+                            </button>
+                        </div>
+                        <button onclick="startGameSession('multiplayer')" class="god-btn w-full py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white font-cinzel font-black text-xs uppercase tracking-wider shadow-lg">
+                            ⚡ Multiplayer-Insel mit Discord-Party starten →
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="discord-feedback-banner" class="text-xs text-center py-2 px-3 rounded-xl bg-indigo-950/60 border border-indigo-500/30 text-indigo-200">
+                Status: Bereit für Discord Rich-Presence, Raum-Synchronisation &amp; Channel-Webhooks.
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL 2: SETTINGS & GRAPHICS / LIGHTNING CONFIGURATION                -->
+    <!-- ===================================================================== -->
+    <div id="settings-modal" class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md hidden items-center justify-center p-4">
+        <div class="god-panel-gold rounded-3xl max-w-xl w-full p-6 border border-emerald-400/40 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b border-slate-700 pb-3 mb-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/50 flex items-center justify-center text-lg text-emerald-300">
+                        <i class="fa-solid fa-sliders"></i>
+                    </div>
+                    <div>
+                        <h2 class="font-cinzel font-bold text-lg text-emerald-300">GÖTTLICHE EINSTELLUNGEN</h2>
+                        <p class="text-xs text-slate-400">Grafik, Maus-Blitz-Effekt, Zeitsystem &amp; Audio</p>
+                    </div>
+                </div>
+                <button onclick="toggleModal('settings-modal')" class="god-btn w-8 h-8 rounded-lg bg-slate-800 text-slate-300 hover:text-white">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4 text-xs">
+                <div class="bg-slate-900/90 p-3.5 rounded-xl border border-slate-800">
+                    <div class="flex justify-between font-semibold text-amber-300 mb-1">
+                        <span>⚡ Interaktiver Maus-Blitz-Effekt</span>
+                        <span id="lbl-setting-lightning">Hoch (Immer aktiv)</span>
+                    </div>
+                    <input id="inp-setting-lightning" type="range" min="0" max="2" value="2" oninput="applyGameSettings()" class="w-full accent-amber-400">
+                    <p class="text-[11px] text-slate-400 mt-1">Steuert, ob Blitze deinen Mauszeiger im Startbildschirm (1) oder auch während des Spiels (2) umspielen.</p>
+                </div>
+
+                <div class="bg-slate-900/90 p-3.5 rounded-xl border border-slate-800">
+                    <div class="flex justify-between font-semibold text-sky-300 mb-1">
+                        <span>🏔️ 3D-Grafik &amp; Schatten-Auflösung</span>
+                        <span id="lbl-setting-graphics">Ultra (Hohe Pixel-Dichte)</span>
+                    </div>
+                    <input id="inp-setting-graphics" type="range" min="1" max="3" value="3" oninput="applyGameSettings()" class="w-full accent-sky-400">
+                </div>
+
+                <div class="bg-slate-900/90 p-3.5 rounded-xl border border-slate-800">
+                    <div class="flex justify-between font-semibold text-purple-300 mb-1">
+                        <span>⏳ Standard-Zeitgeschwindigkeit (Tag/Nacht &amp; Epochen)</span>
+                        <span id="lbl-setting-timespeed">1x Normal</span>
+                    </div>
+                    <input id="inp-setting-timespeed" type="range" min="1" max="4" value="1" oninput="applyGameSettings()" class="w-full accent-purple-400">
+                </div>
+
+                <div class="bg-slate-900/90 p-3.5 rounded-xl border border-slate-800">
+                    <div class="flex justify-between font-semibold text-emerald-300 mb-1">
+                        <span>🎥 Kamera-Schwenkgeschwindigkeit</span>
+                        <span id="lbl-setting-camspeed">52</span>
+                    </div>
+                    <input id="inp-setting-camspeed" type="range" min="25" max="90" value="52" oninput="applyGameSettings()" class="w-full accent-emerald-400">
+                </div>
+            </div>
+
+            <div class="mt-5 flex justify-end">
+                <button onclick="toggleModal('settings-modal')" class="god-btn px-6 py-2 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 text-slate-950 font-cinzel font-bold text-xs">
+                    Speichern &amp; Schließen
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL 3: CREATURE NEURAL BRAIN MATRIX                                 -->
+    <!-- ===================================================================== -->
+    <div id="creature-modal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md hidden items-center justify-center p-4">
+        <div class="god-panel-gold rounded-3xl max-w-xl w-full p-6 border border-purple-400/40 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b border-slate-700 pb-3 mb-4">
+                <div>
+                    <h2 class="font-cinzel font-bold text-lg text-amber-300">NEURONALES KREATUREN-GEHIRN</h2>
+                    <p class="text-xs text-slate-400">Black &amp; White 2 Verhaltens-Feinabstimmung &amp; Spezies-Wahl</p>
+                </div>
+                <button onclick="toggleModal('creature-modal')" class="god-btn w-8 h-8 rounded-lg bg-slate-800 text-slate-300 hover:text-white">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="space-y-3 text-xs">
+                <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                    <div class="flex justify-between mb-1 font-semibold text-emerald-300">
+                        <span>🌲 Rohstoffe sammeln &amp; einlagern</span>
+                        <span id="weight-val-gather">70%</span>
+                    </div>
+                    <input type="range" min="0" max="100" value="70" oninput="updateCreatureWeight('gather', this.value)" id="slider-weight-gather" class="w-full accent-emerald-400">
+                </div>
+                <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                    <div class="flex justify-between mb-1 font-semibold text-sky-300">
+                        <span>🏗️ Baustellen der Siedlung errichten</span>
+                        <span id="weight-val-build">65%</span>
+                    </div>
+                    <input type="range" min="0" max="100" value="65" oninput="updateCreatureWeight('build', this.value)" id="slider-weight-build" class="w-full accent-sky-400">
+                </div>
+                <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                    <div class="flex justify-between mb-1 font-semibold text-pink-300">
+                        <span>🎭 Bewohner unterhalten (+Glaube &amp; Eindruck)</span>
+                        <span id="weight-val-entertain">60%</span>
+                    </div>
+                    <input type="range" min="0" max="100" value="60" oninput="updateCreatureWeight('entertain', this.value)" id="slider-weight-entertain" class="w-full accent-pink-400">
+                </div>
+                <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                    <div class="flex justify-between mb-1 font-semibold text-rose-300">
+                        <span>⚔️ Feindliche Armeen attackieren</span>
+                        <span id="weight-val-attack">45%</span>
+                    </div>
+                    <input type="range" min="0" max="100" value="45" oninput="updateCreatureWeight('attack', this.value)" id="slider-weight-attack" class="w-full accent-rose-400">
+                </div>
+            </div>
+
+            <div class="mt-5 flex justify-end">
+                <button onclick="toggleModal('creature-modal')" class="god-btn px-5 py-2 rounded-xl bg-amber-500 text-slate-950 font-bold text-xs">
+                    Schließen
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL 4: TRIBUTE CHAMBER (UPGRADES)                                   -->
+    <!-- ===================================================================== -->
+    <div id="tribute-modal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md hidden items-center justify-center p-4">
+        <div class="god-panel-gold rounded-3xl max-w-2xl w-full p-6 border border-amber-400/40 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b border-slate-700 pb-3 mb-4">
+                <div>
+                    <h2 class="font-cinzel font-bold text-lg text-amber-300">TRIBUT-KAMMER DES OLYMP</h2>
+                    <p class="text-xs text-slate-400">Schalte göttliche Upgrades mit Tribut frei</p>
+                </div>
+                <button onclick="toggleModal('tribute-modal')" class="god-btn w-8 h-8 rounded-lg bg-slate-800 text-slate-300 hover:text-white">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div id="tribute-upgrades-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs"></div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- JAVASCRIPT ENGINE: AUDIO, LIGHTNING CURSOR, 3D WORLD & SIMULATION     -->
+    <!-- ===================================================================== -->
+    <script>
+        /**********************************************************************
+         * 1. WEB AUDIO SYNTHESIZER (Zero external audio dependencies)
+         **********************************************************************/
+        const SoundFX = {
+            ctx: null,
+            enabled: true,
+            init() {
+                if (!this.ctx) {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    if (AudioCtx) this.ctx = new AudioCtx();
+                }
+                if (this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            },
+            playTone(freq, type = 'sine', duration = 0.18, vol = 0.12, slideTo = null) {
+                if (!this.enabled) return;
+                try {
+                    this.init();
+                    if (!this.ctx) return;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                    if (slideTo) {
+                        osc.frequency.exponentialRampToValueAtTime(slideTo, this.ctx.currentTime + duration);
+                    }
+                    gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + duration);
+                } catch (e) {}
+            },
+            electricZaps() {
+                this.playTone(160, 'sawtooth', 0.09, 0.05, 620);
+            },
+            grab() {
+                this.playTone(300, 'sine', 0.12, 0.12, 540);
+            },
+            drop() {
+                this.playTone(440, 'triangle', 0.15, 0.12, 220);
+            },
+            throwObj() {
+                this.playTone(240, 'sawtooth', 0.25, 0.14, 780);
+            },
+            build() {
+                this.playTone(260, 'triangle', 0.18, 0.14, 520);
+            },
+            miracleGood() {
+                this.playTone(523.25, 'sine', 0.35, 0.12, 659.25);
+                setTimeout(() => this.playTone(783.99, 'sine', 0.4, 0.12, 1046.5), 110);
+            },
+            miracleEvil() {
+                this.playTone(145, 'sawtooth', 0.45, 0.16, 62);
+            },
+            praise() {
+                this.playTone(440, 'sine', 0.22, 0.12, 880);
+            },
+            slap() {
+                this.playTone(130, 'square', 0.16, 0.16, 55);
+            }
+        };
+
+        function toggleAudio() {
+            SoundFX.enabled = !SoundFX.enabled;
+            const btn = document.getElementById('btn-audio');
+            btn.innerHTML = SoundFX.enabled
+                ? '<i class="fa-solid fa-volume-high"></i>'
+                : '<i class="fa-solid fa-volume-xmark text-rose-400"></i>';
+        }
+
+        /**********************************************************************
+         * 2. INTERACTIVE MOUSE-TRIGGERED LIGHTNING & SPARKS ENGINE
+         **********************************************************************/
+        const LightningFX = {
+            canvas: null,
+            ctx: null,
+            mouseX: window.innerWidth * 0.5,
+            mouseY: window.innerHeight * 0.5,
+            prevMouseX: window.innerWidth * 0.5,
+            prevMouseY: window.innerHeight * 0.5,
+            isMouseDown: false,
+            sparks: [],
+            bolts: [],
+            intensityMode: 2, // 0: Off, 1: Start Screen Only, 2: Always Active
+
+            init() {
+                this.canvas = document.getElementById('lightning-fx-canvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.resize();
+                window.addEventListener('resize', () => this.resize());
+
+                window.addEventListener('mousemove', (e) => {
+                    const dx = e.clientX - this.mouseX;
+                    const dy = e.clientY - this.mouseY;
+                    const speed = Math.hypot(dx, dy);
+                    this.prevMouseX = this.mouseX;
+                    this.prevMouseY = this.mouseY;
+                    this.mouseX = e.clientX;
+                    this.mouseY = e.clientY;
+
+                    if (!this.shouldRender()) return;
+
+                    // Spawn sparks along cursor trajectory
+                    const isGoodSide = this.mouseX > window.innerWidth * 0.5;
+                    const color = isGoodSide ? '#38bdf8' : '#f43f5e';
+                    const coreColor = '#fde047';
+
+                    for (let i = 0; i < Math.min(4, Math.ceil(speed / 12)); i++) {
+                        this.sparks.push({
+                            x: this.mouseX + (Math.random() - 0.5) * 12,
+                            y: this.mouseY + (Math.random() - 0.5) * 12,
+                            vx: (Math.random() - 0.5) * 3.8 - dx * 0.06,
+                            vy: (Math.random() - 0.5) * 3.8 - dy * 0.06,
+                            life: 1.0,
+                            color: Math.random() > 0.35 ? color : coreColor,
+                            size: 1.8 + Math.random() * 2.5
+                        });
+                    }
+
+                    // Trigger jagged lightning bolts when moving cursor quickly or on Start Screen
+                    const startVisible = !document.getElementById('start-screen').classList.contains('hidden');
+                    const boltChance = startVisible ? 0.45 : 0.16;
+                    if (speed > 6 && Math.random() < boltChance) {
+                        const angle = Math.random() * Math.PI * 2;
+                        const radius = startVisible ? (75 + Math.random() * 140) : (40 + Math.random() * 65);
+                        const startX = this.mouseX + Math.cos(angle) * radius;
+                        const startY = this.mouseY + Math.sin(angle) * radius;
+                        this.spawnBolt(startX, startY, this.mouseX, this.mouseY, isGoodSide);
+                    }
+                });
+
+                window.addEventListener('mousedown', (e) => {
+                    this.isMouseDown = true;
+                    if (!this.shouldRender()) return;
+                    const isGoodSide = e.clientX > window.innerWidth * 0.5;
+                    for (let k = 0; k < 4; k++) {
+                        const angle = (k / 4) * Math.PI * 2 + Math.random() * 0.6;
+                        const dist = 90 + Math.random() * 110;
+                        this.spawnBolt(
+                            e.clientX + Math.cos(angle) * dist,
+                            e.clientY + Math.sin(angle) * dist,
+                            e.clientX,
+                            e.clientY,
+                            isGoodSide
+                        );
+                    }
+                    if (!GameState.started) SoundFX.electricZaps();
+                });
+
+                window.addEventListener('mouseup', () => {
+                    this.isMouseDown = false;
+                });
+            },
+
+            resize() {
+                if (!this.canvas) return;
+                this.canvas.width = window.innerWidth;
+                this.canvas.height = window.innerHeight;
+            },
+
+            shouldRender() {
+                if (this.intensityMode === 0) return false;
+                const startVisible = !document.getElementById('start-screen').classList.contains('hidden');
+                if (this.intensityMode === 1 && !startVisible) return false;
+                return true;
+            },
+
+            spawnBolt(x1, y1, x2, y2, isGood) {
+                const points = [{ x: x1, y: y1 }];
+                const steps = 8;
+                for (let i = 1; i < steps; i++) {
+                    const t = i / steps;
+                    const jitter = (1 - Math.abs(t - 0.5) * 2) * 34;
+                    points.push({
+                        x: x1 + (x2 - x1) * t + (Math.random() - 0.5) * jitter,
+                        y: y1 + (y2 - y1) * t + (Math.random() - 0.5) * jitter
+                    });
+                }
+                points.push({ x: x2, y: y2 });
+                this.bolts.push({
+                    points,
+                    life: 1.0,
+                    color: isGood ? '#38bdf8' : '#f43f5e',
+                    glowColor: isGood ? 'rgba(56, 189, 248, 0.8)' : 'rgba(244, 63, 94, 0.8)'
+                });
+            },
+
+            updateAndDraw(dt) {
+                if (!this.ctx) return;
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                if (!this.shouldRender()) return;
+
+                const startVisible = !document.getElementById('start-screen').classList.contains('hidden');
+                if (startVisible && Math.random() < 0.14) {
+                    const isGood = this.mouseX > window.innerWidth * 0.5;
+                    const a = Math.random() * Math.PI * 2;
+                    const d = 45 + Math.random() * 80;
+                    this.spawnBolt(this.mouseX + Math.cos(a) * d, this.mouseY + Math.sin(a) * d, this.mouseX, this.mouseY, isGood);
+                }
+
+                // Draw Cursor Aura Halo on Start Screen
+                if (startVisible) {
+                    const isGood = this.mouseX > window.innerWidth * 0.5;
+                    const grad = this.ctx.createRadialGradient(this.mouseX, this.mouseY, 2, this.mouseX, this.mouseY, 55);
+                    grad.addColorStop(0, 'rgba(253, 224, 71, 0.38)');
+                    grad.addColorStop(0.45, isGood ? 'rgba(56, 189, 248, 0.18)' : 'rgba(244, 63, 94, 0.18)');
+                    grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                    this.ctx.fillStyle = grad;
+                    this.ctx.beginPath();
+                    this.ctx.arc(this.mouseX, this.mouseY, 55, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+
+                // Draw active Lightning Bolts
+                for (let i = this.bolts.length - 1; i >= 0; i--) {
+                    const b = this.bolts[i];
+                    b.life -= dt * 7.5;
+                    if (b.life <= 0) {
+                        this.bolts.splice(i, 1);
+                        continue;
+                    }
+                    this.ctx.save();
+                    this.ctx.globalAlpha = Math.max(0, b.life);
+                    this.ctx.strokeStyle = b.color;
+                    this.ctx.shadowColor = b.glowColor;
+                    this.ctx.shadowBlur = 14;
+                    this.ctx.lineWidth = 2.4 * b.life;
+                    this.ctx.beginPath();
+                    b.points.forEach((pt, idx) => {
+                        if (idx === 0) this.ctx.moveTo(pt.x, pt.y);
+                        else this.ctx.lineTo(pt.x, pt.y);
+                    });
+                    this.ctx.stroke();
+
+                    // Bright white inner core
+                    this.ctx.strokeStyle = '#ffffff';
+                    this.ctx.lineWidth = 1.0 * b.life;
+                    this.ctx.stroke();
+                    this.ctx.restore();
+                }
+
+                // Draw Sparks
+                for (let i = this.sparks.length - 1; i >= 0; i--) {
+                    const s = this.sparks[i];
+                    s.x += s.vx;
+                    s.y += s.vy;
+                    s.life -= dt * 2.6;
+                    if (s.life <= 0) {
+                        this.sparks.splice(i, 1);
+                        continue;
+                    }
+                    this.ctx.save();
+                    this.ctx.globalAlpha = Math.max(0, s.life);
+                    this.ctx.fillStyle = s.color;
+                    this.ctx.beginPath();
+                    this.ctx.arc(s.x, s.y, s.size * s.life, 0, Math.PI * 2);
+                    this.ctx.fill();
+                    this.ctx.restore();
+                }
+            }
+        };
+
+        // 3D Tilt & Scroller Helpers for the "Gottloser Scroller-Effekt"
+        function tiltCard3D(event, cardEl) {
+            const rect = cardEl.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            const centerX = rect.width / 2;
+            const centerY = rect.height / 2;
+            const rotateX = ((y - centerY) / centerY) * -8;
+            const rotateY = ((x - centerX) / centerX) * 8;
+            cardEl.style.transform = `translateY(-10px) scale(1.03) rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg)`;
+        }
+
+        function resetCard3D(cardEl) {
+            cardEl.style.transform = '';
+        }
+
+        function scrollModeCards(dir) {
+            const scroller = document.getElementById('ungodly-scroller');
+            if (scroller) {
+                scroller.scrollBy({ left: dir * 340, behavior: 'smooth' });
+                SoundFX.electricZaps();
+            }
+        }
+
+        /**********************************************************************
+         * 3. CORE GAME STATE (Eras, Faith, Weather, Creature, Discord Party)
+         **********************************************************************/
+        const ERAS_CATALOG = [
+            {
+                era: 1,
+                name: 'Epoche I • Nomaden-Ursprung',
+                shortLabel: 'EPOCHE I • NOMADEN',
+                faithRequired: 0,
+                nextFaith: 100,
+                influenceTarget: 34,
+                desc: 'Ein kleines Zeltlager am heiligen Fluss. Manifestiere den Glauben deiner Nomaden durch Gebete und Wunder!'
+            },
+            {
+                era: 2,
+                name: 'Epoche II • Antike Siedlung',
+                shortLabel: 'EPOCHE II • SIEDLUNG',
+                faithRequired: 100,
+                nextFaith: 250,
+                influenceTarget: 54,
+                desc: 'Dein Glaube schlägt Wurzeln! Der Schrein erhebt sich zum Steintempel und dein Einflussbereich wächst.'
+            },
+            {
+                era: 3,
+                name: 'Epoche III • Klassische Polis',
+                shortLabel: 'EPOCHE III • POLIS',
+                faithRequired: 250,
+                nextFaith: 480,
+                influenceTarget: 76,
+                desc: 'Strahlender Marmor! Deine Stadt wird zur griechischen Polis mit hoher Anziehungskraft auf fremde Völker.'
+            },
+            {
+                era: 4,
+                name: 'Epoche IV • Göttliches Imperium',
+                shortLabel: 'EPOCHE IV • IMPERIUM',
+                faithRequired: 480,
+                nextFaith: 9999,
+                influenceTarget: 105,
+                desc: 'Deine Zivilisation hat den Zenit des Olymp erreicht! Monumentale Bauten und kosmische Macht beherrschen die Insel.'
+            }
+        ];
+
+        const GameState = {
+            started: false,
+            mode: 'singleplayer', // 'singleplayer' | 'multiplayer' | 'training'
+            alignment: 0,
+            era: 1,
+            faith: 15,
+            nextEraFaith: 100,
+            resources: {
+                wood: 90,
+                grain: 90,
+                ore: 50,
+                mana: 80,
+                impressiveness: 35,
+                tribute: 100,
+                pop: 5,
+                maxPop: 10
+            },
+            influenceRadius: 34,
+            interactionMode: 'hand',
+            selectedBuildingType: null,
+            selectedMiracleType: null,
+            handCarryBonus: 1,
+            cameraPanSpeed: 52,
+
+            // Discord & Multiplayer State
+            discord: {
+                connected: false,
+                username: 'OlympusGod#0001',
+                serverInvite: 'discord.gg/bw-ultra-pantheon',
+                webhookUrl: '',
+                roomCode: 'BWU-' + Math.floor(1000 + Math.random() * 8999),
+                partyMembers: [
+                    { name: 'Du (Host-Gottheit)', role: 'Griechen • Epoche I', online: true }
+                ]
+            },
+
+            // Dynamic Time, Seasons, Weather & Cosmic Events
+            time: {
+                speedMultiplier: 1,
+                hour: 9.5,
+                dayCount: 1,
+                year: 1,
+                seasonIndex: 0,
+                seasons: [
+                    { id: 'spring', name: 'Frühling', icon: '🌸', grainMult: 1.15 },
+                    { id: 'summer', name: 'Sommer', icon: '☀️', grainMult: 1.35 },
+                    { id: 'autumn', name: 'Herbst', icon: '🍂', grainMult: 0.95 },
+                    { id: 'winter', name: 'Winter', icon: '❄️', grainMult: 0.65 }
+                ],
+                weather: 'clear',
+                weatherTimer: 30,
+                cosmicTimer: 55
+            },
+
+            // Interactive Training Tutorial
+            tutorial: {
+                active: false,
+                step: 0,
+                steps: [
+                    {
+                        title: '1. Die Göttliche Perspektive',
+                        desc: 'Bewege deine Sicht mit <b>W, A, S, D</b> (oder Pfeiltasten) über das Flusstal und drehe sie mit <b>Q / E</b>.',
+                        task: 'Bewege deine Kamera über die Insel...'
+                    },
+                    {
+                        title: '2. Glauben manifestieren (Hand Gottes)',
+                        desc: 'Klicke mit <b>Linksklick</b> auf einen Dorfbewohner, um ihn hochzuheben, und lege ihn am <b>Tempel / Schrein</b> ab, damit er als Priester betet!',
+                        task: 'Greife einen Bewohner und setze ihn am Tempel ab...'
+                    },
+                    {
+                        title: '3. Rohstoffe mit der Hand ernten',
+                        desc: 'Reiße einen Baum oder Erzfelsen per <b>Linksklick</b> aus und lege ihn am <b>Lagerhaus</b> ab, um sofort Rohstoffe zu erhalten.',
+                        task: 'Lege einen Baum oder Erzfelsen am Lagerhaus ab...'
+                    },
+                    {
+                        title: '4. Siedlung erweitern (Bauen)',
+                        desc: 'Wähle unten in der Leiste ein <b>Haus</b> oder <b>Feld</b> aus und platziere es innerhalb deines leuchtenden Einflussrings.',
+                        task: 'Platziere ein neues Gebäude im Einflussbereich...'
+                    },
+                    {
+                        title: '5. Gesten-Wunder wirken',
+                        desc: 'Halte die <b>rechte Maustaste</b> gedrückt und zeichne eine <b>Spirale</b> oder <b>Kreis</b> (oder drücke Taste 1–5), um ein Wunder zu wirken!',
+                        task: 'Zeichne mit Rechtsklick eine Geste oder wirke ein Wunder...'
+                    },
+                    {
+                        title: '6. Die Kreatur erziehen',
+                        desc: 'Klicke links im Kreaturen-Menü auf <b>„👏 Loben“</b> oder <b>„⚡ Strafen“</b>, um das Verhalten deines Avatars zu prägen!',
+                        task: 'Lobe oder bestrafe deine Kreatur einmal...'
+                    }
+                ]
+            },
+
+            // Creature Avatar
+            creature: {
+                species: 'lion',
+                name: 'Titanen-Löwe',
+                icon: '🦁',
+                level: 1,
+                scale: 1.0,
+                hp: 100,
+                maxHp: 100,
+                hunger: 88,
+                alignment: 0,
+                role: 'free',
+                thought: 'Erkundet das junge Nomadenlager',
+                lastActionCategory: 'entertain',
+                lastActionDescription: 'Begrüßt die ersten Nomaden',
+                pos: new THREE.Vector3(-8, 0, 8),
+                targetPos: new THREE.Vector3(-8, 0, 8),
+                stateTimer: 0,
+                weights: { gather: 70, build: 65, entertain: 60, attack: 45 }
+            },
+
+            // Rival Tribes
+            tribes: {
+                vikings: {
+                    id: 'vikings',
+                    name: 'Wikinger (Nord-Fjord)',
+                    icon: '🛡️',
+                    pos: new THREE.Vector3(0, 0, -90),
+                    hp: 300,
+                    maxHp: 300,
+                    impressNeeded: 180,
+                    conquered: false,
+                    conqueredHow: null,
+                    color: 0x38bdf8
+                },
+                japanese: {
+                    id: 'japanese',
+                    name: 'Japaner (Ost-Plateau)',
+                    icon: '⛩️',
+                    pos: new THREE.Vector3(90, 0, -10),
+                    hp: 450,
+                    maxHp: 450,
+                    impressNeeded: 320,
+                    conquered: false,
+                    conqueredHow: null,
+                    color: 0x4ade80
+                },
+                aztecs: {
+                    id: 'aztecs',
+                    name: 'Azteken (Süd-Vulkan)',
+                    icon: '🌋',
+                    pos: new THREE.Vector3(14, 0, 92),
+                    hp: 650,
+                    maxHp: 650,
+                    impressNeeded: 520,
+                    conquered: false,
+                    conqueredHow: null,
+                    color: 0xf43f5e
+                }
+            },
+
+            // Quest Scrolls
+            quests: [
+                {
+                    id: 'q_origin',
+                    title: 'Der Erste Funke des Glaubens',
+                    desc: 'Entsende einen Bewohner zum Schrein oder wirke ein Regen-Wunder für die Nomaden.',
+                    rewardTribute: 60,
+                    pos: new THREE.Vector3(-12, 0, -10),
+                    completed: false
+                },
+                {
+                    id: 'q_forest',
+                    title: 'Das Heilige Hain-Rätsel',
+                    desc: 'Lasse den verdorrten Hain im Osten durch göttlichen Regen erblühen.',
+                    rewardTribute: 75,
+                    pos: new THREE.Vector3(24, 0, -14),
+                    completed: false
+                },
+                {
+                    id: 'q_aztec',
+                    title: 'Vorhut der Azteken',
+                    desc: 'Präsentiere den Spähern im Süden deine göttliche Macht (Wunder oder Phalanx).',
+                    rewardTribute: 95,
+                    pos: new THREE.Vector3(6, 0, 32),
+                    completed: false
+                }
+            ],
+
+            // Tribute Shop Upgrades
+            upgrades: [
+                { id: 'u_hand', name: 'Göttliche Riesenkraft', desc: 'Hand Gottes erntet doppelte Rohstoffe (+100%).', cost: 60, bought: false },
+                { id: 'u_titan', name: 'Avatar-Wachstumsschub', desc: 'Deine Kreatur wächst auf Titanen-Größe (+35% Stärke).', cost: 80, bought: false },
+                { id: 'u_faith', name: 'Mysterien von Eleusis', desc: 'Manifestiert sofort +120 Glauben & +100 Eindruck.', cost: 90, bought: false },
+                { id: 'u_mana', name: 'Kristall-Fokus des Olymp', desc: 'Sofort +300 Göttliches Mana für epische Wunder.', cost: 70, bought: false }
+            ]
+        };
+
+        const BUILDING_CATALOG = {
+            house:      { name: 'Wohnhaus',       wood: 35, ore: 0,  impress: 15, popBonus: 5, alignShift: 2 },
+            farm:       { name: 'Getreidefeld',   wood: 25, ore: 0,  impress: 10, popBonus: 0, alignShift: 3 },
+            storehouse: { name: 'Lagerhaus',      wood: 45, ore: 15, impress: 20, popBonus: 0, alignShift: 1 },
+            barracks:   { name: 'Kriegskaserne',  wood: 50, ore: 40, impress: 25, popBonus: 0, alignShift: -10 },
+            garden:     { name: 'Elysischer Brunnen', wood: 30, ore: 10, impress: 45, popBonus: 0, alignShift: 12 },
+            spikes:     { name: 'Folter-Dornen',  wood: 20, ore: 30, impress: 30, popBonus: 0, alignShift: -16 },
+            obelisk:    { name: 'Sonnen-Obelisk', wood: 60, ore: 60, impress: 90, popBonus: 0, alignShift: 6 }
+        };
+
+        /**********************************************************************
+         * 4. THREE.JS 3D WORLD, DETAILED TERRAIN, SKY & ALIGNMENT MORPHING
+         **********************************************************************/
+        let scene, camera, renderer, raycaster, mouseNDC;
+        let terrainMesh, waterMesh, influenceRingMesh, godHandGroup, buildPreviewMesh;
+        let ambientLight, sunLight, volcanoLight, celestialGroup, sunSphere, moonSphere, starField, cloudGroup, weatherParticleGroup;
+        const clock = new THREE.Clock();
+
+        const CameraController = {
+            target: new THREE.Vector3(0, 0, 6),
+            distance: 78,
+            yaw: 0.35,
+            pitch: 0.72,
+            keys: {},
+            isMiddleDragging: false,
+            prevMouse: { x: 0, y: 0 }
+        };
+
+        const WorldEntities = {
+            buildings: [],
+            villagers: [],
+            resources: [],
+            platoons: [],
+            scrollMeshes: [],
+            particles: [],
+            thrownObjects: [],
+            decorProps: []
+        };
+
+        let creatureMeshGroup = null;
+
+        function getRiverCenterX(z) {
+            return -18 + Math.sin(z * 0.045) * 14 - Math.max(0, (z + 10) * 0.45);
+        }
+
+        function getTerrainHeight(x, z) {
+            const distFromCenter = Math.sqrt(x * x + z * z);
+            if (distFromCenter > 146) return -5.0;
+
+            const angle = Math.atan2(z, x);
+            const coastMod = Math.sin(angle * 4) * 8 + Math.cos(angle * 7) * 5;
+            const effectiveRadius = 136 + coastMod;
+            if (distFromCenter > effectiveRadius + 8) return -4.5;
+
+            let h = Math.max(-3.8, (1 - Math.pow(distFromCenter / effectiveRadius, 2.15)) * 10.2);
+
+            const ridge = Math.sin(x * 0.055) * Math.cos(z * 0.055) * 1.45
+                        + Math.sin(x * 0.13 + z * 0.11) * 0.45;
+            h += ridge;
+
+            // Flatten Central Greek Valley
+            const distGreek = Math.sqrt(x * x + z * z);
+            if (distGreek < 40) {
+                h = THREE.MathUtils.lerp(2.3, h, Math.pow(distGreek / 40, 2));
+            }
+
+            // Carve River Valley
+            if (z > -88 && z < 75) {
+                const riverX = getRiverCenterX(z);
+                const distToRiver = Math.abs(x - riverX);
+                if (distToRiver < 9.5) {
+                    h -= Math.cos((distToRiver / 9.5) * Math.PI * 0.5) * 2.85;
+                }
+            }
+
+            // Northern Viking Highlands
+            const distViking = Math.hypot(x - 0, z + 92);
+            if (distViking < 38) {
+                h += Math.cos((distViking / 38) * Math.PI * 0.5) * 6.2;
+            }
+
+            // Northwestern Waterfall Peak
+            const distPeak = Math.hypot(x + 22, z + 78);
+            if (distPeak < 22) {
+                h += Math.cos((distPeak / 22) * Math.PI * 0.5) * 11.5;
+            }
+
+            // Eastern Japanese Terraced Plateau
+            const distJapan = Math.hypot(x - 92, z + 10);
+            if (distJapan < 38) {
+                const rawTerrace = Math.cos((distJapan / 38) * Math.PI * 0.5) * 5.2;
+                h += Math.floor(rawTerrace * 1.5) / 1.5;
+            }
+
+            // Southern Aztec Volcano
+            const distVolcanoPeak = Math.hypot(x - 16, z - 114);
+            if (distVolcanoPeak < 30) {
+                const cone = Math.cos((distVolcanoPeak / 30) * Math.PI * 0.5) * 24;
+                const crater = distVolcanoPeak < 6.5 ? -5.0 * (1 - distVolcanoPeak / 6.5) : 0;
+                h += cone + crater;
+            }
+
+            return h;
+        }
+
+        function initThreeWorld() {
+            const container = document.getElementById('webgl-container');
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x68a6d8);
+            scene.fog = new THREE.FogExp2(0x68a6d8, 0.0028);
+
+            camera = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 1, 750);
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            raycaster = new THREE.Raycaster();
+            mouseNDC = new THREE.Vector2();
+
+            ambientLight = new THREE.AmbientLight(0xdbeafe, 0.68);
+            scene.add(ambientLight);
+
+            sunLight = new THREE.DirectionalLight(0xfffbeb, 1.2);
+            sunLight.position.set(85, 130, 65);
+            sunLight.castShadow = true;
+            sunLight.shadow.mapSize.width = 2048;
+            sunLight.shadow.mapSize.height = 2048;
+            sunLight.shadow.camera.near = 10;
+            sunLight.shadow.camera.far = 360;
+            const d = 150;
+            sunLight.shadow.camera.left = -d;
+            sunLight.shadow.camera.right = d;
+            sunLight.shadow.camera.top = d;
+            sunLight.shadow.camera.bottom = -d;
+            scene.add(sunLight);
+
+            volcanoLight = new THREE.PointLight(0xff4500, 2.5, 75);
+            volcanoLight.position.set(16, 27, 114);
+            scene.add(volcanoLight);
+
+            buildIslandTerrain();
+
+            const waterGeo = new THREE.PlaneGeometry(750, 750, 48, 48);
+            waterGeo.rotateX(-Math.PI / 2);
+            const waterMat = new THREE.MeshStandardMaterial({
+                color: 0x0284c7,
+                roughness: 0.18,
+                metalness: 0.38,
+                transparent: true,
+                opacity: 0.88
+            });
+            waterMesh = new THREE.Mesh(waterGeo, waterMat);
+            waterMesh.position.y = -0.25;
+            waterMesh.receiveShadow = true;
+            scene.add(waterMesh);
+
+            buildCelestialAndWeatherSystem();
+            buildInfluenceRing();
+            buildGodHand3D();
+
+            const previewGeo = new THREE.BoxGeometry(5, 4, 5);
+            const previewMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, wireframe: true, transparent: true, opacity: 0.65 });
+            buildPreviewMesh = new THREE.Mesh(previewGeo, previewMat);
+            buildPreviewMesh.visible = false;
+            scene.add(buildPreviewMesh);
+
+            populateInitialIsland();
+            updateWorldAlignmentVisuals();
+        }
+
+        function buildIslandTerrain() {
+            const size = 340;
+            const segments = 160;
+            const geo = new THREE.PlaneGeometry(size, size, segments, segments);
+            geo.rotateX(-Math.PI / 2);
+
+            const posAttr = geo.attributes.position;
+            const colors = new Float32Array(posAttr.count * 3);
+
+            for (let i = 0; i < posAttr.count; i++) {
+                const vx = posAttr.getX(i);
+                const vz = posAttr.getZ(i);
+                const vy = getTerrainHeight(vx, vz);
+                posAttr.setY(i, vy);
+                colors[i * 3] = 0.28;
+                colors[i * 3 + 1] = 0.58;
+                colors[i * 3 + 2] = 0.26;
+            }
+
+            geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            geo.computeVertexNormals();
+
+            const mat = new THREE.MeshStandardMaterial({
+                vertexColors: true,
+                roughness: 0.84,
+                metalness: 0.06,
+                flatShading: true
+            });
+
+            terrainMesh = new THREE.Mesh(geo, mat);
+            terrainMesh.receiveShadow = true;
+            scene.add(terrainMesh);
+        }
+
+        function buildCelestialAndWeatherSystem() {
+            celestialGroup = new THREE.Group();
+            scene.add(celestialGroup);
+
+            sunSphere = new THREE.Mesh(
+                new THREE.SphereGeometry(9, 16, 16),
+                new THREE.MeshBasicMaterial({ color: 0xfde047 })
+            );
+            celestialGroup.add(sunSphere);
+
+            moonSphere = new THREE.Mesh(
+                new THREE.SphereGeometry(6.5, 16, 16),
+                new THREE.MeshBasicMaterial({ color: 0xe2e8f0 })
+            );
+            celestialGroup.add(moonSphere);
+
+            const starGeo = new THREE.BufferGeometry();
+            const starCount = 420;
+            const starPos = new Float32Array(starCount * 3);
+            for (let i = 0; i < starCount; i++) {
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.random() * Math.PI * 0.48;
+                const r = 270;
+                starPos[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+                starPos[i * 3 + 1] = r * Math.cos(phi);
+                starPos[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
+            }
+            starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+            starField = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 1.8, transparent: true, opacity: 0.0 }));
+            scene.add(starField);
+
+            cloudGroup = new THREE.Group();
+            const cloudMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, transparent: true, opacity: 0.82 });
+            for (let c = 0; c < 14; c++) {
+                const singleCloud = new THREE.Group();
+                for (let p = 0; p < 4; p++) {
+                    const puff = new THREE.Mesh(new THREE.DodecahedronGeometry(3.4 + Math.random() * 2, 1), cloudMat);
+                    puff.position.set((p - 1.5) * 3.2, (Math.random() - 0.5) * 1.2, (Math.random() - 0.5) * 2.2);
+                    puff.scale.y = 0.55;
+                    singleCloud.add(puff);
+                }
+                singleCloud.position.set((Math.random() - 0.5) * 260, 42 + Math.random() * 16, (Math.random() - 0.5) * 260);
+                cloudGroup.add(singleCloud);
+            }
+            scene.add(cloudGroup);
+
+            weatherParticleGroup = new THREE.Group();
+            const dropGeo = new THREE.BoxGeometry(0.15, 1.4, 0.15);
+            const dropMat = new THREE.MeshBasicMaterial({ color: 0xbae6fd, transparent: true, opacity: 0.7 });
+            for (let i = 0; i < 160; i++) {
+                const drop = new THREE.Mesh(dropGeo, dropMat);
+                drop.position.set((Math.random() - 0.5) * 180, Math.random() * 55, (Math.random() - 0.5) * 180);
+                weatherParticleGroup.add(drop);
+            }
+            weatherParticleGroup.visible = false;
+            scene.add(weatherParticleGroup);
+        }
+
+        function buildInfluenceRing() {
+            const segments = 96;
+            const pts = [];
+            for (let i = 0; i <= segments; i++) {
+                const a = (i / segments) * Math.PI * 2;
+                const rx = Math.cos(a) * GameState.influenceRadius;
+                const rz = Math.sin(a) * GameState.influenceRadius;
+                const ry = Math.max(0.4, getTerrainHeight(rx, rz) + 0.45);
+                pts.push(new THREE.Vector3(rx, ry, rz));
+            }
+            const curve = new THREE.CatmullRomCurve3(pts, true);
+            const tubeGeo = new THREE.TubeGeometry(curve, 96, 0.38, 8, true);
+            const tubeMat = new THREE.MeshBasicMaterial({ color: 0x22c55e, transparent: true, opacity: 0.78 });
+            influenceRingMesh = new THREE.Mesh(tubeGeo, tubeMat);
+            scene.add(influenceRingMesh);
+        }
+
+        function updateInfluenceRingGeometry() {
+            if (influenceRingMesh) {
+                scene.remove(influenceRingMesh);
+                influenceRingMesh.geometry.dispose();
+            }
+            buildInfluenceRing();
+        }
+
+        function buildGodHand3D() {
+            godHandGroup = new THREE.Group();
+            const mainMat = new THREE.MeshStandardMaterial({
+                color: 0xfde68a,
+                emissive: 0xd97706,
+                emissiveIntensity: 0.35,
+                roughness: 0.3
+            });
+            const palm = new THREE.Mesh(new THREE.SphereGeometry(1.15, 16, 16), mainMat);
+            palm.scale.set(1.1, 0.55, 1.25);
+            godHandGroup.add(palm);
+
+            for (let i = 0; i < 4; i++) {
+                const finger = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.24, 1.3, 8), mainMat);
+                finger.position.set((i - 1.5) * 0.42, -0.2, -1.1);
+                finger.rotation.x = Math.PI / 3;
+                godHandGroup.add(finger);
+            }
+
+            const haloMat = new THREE.MeshBasicMaterial({ color: 0x10b981, side: THREE.DoubleSide, transparent: true, opacity: 0.65 });
+            const halo = new THREE.Mesh(new THREE.RingGeometry(1.6, 2.0, 24), haloMat);
+            halo.rotation.x = -Math.PI / 2;
+            halo.position.y = -1.2;
+            godHandGroup.add(halo);
+
+            godHandGroup.userData = { mainMaterial: mainMat, haloMaterial: haloMat };
+            godHandGroup.position.set(0, 8, 0);
+            scene.add(godHandGroup);
+        }
+
+        function updateWorldAlignmentVisuals() {
+            if (!terrainMesh) return;
+            const align = GameState.alignment;
+            const tGood = Math.max(0, align / 100);
+            const tEvil = Math.max(0, -align / 100);
+            const seasonIdx = GameState.time.seasonIndex;
+
+            const posAttr = terrainMesh.geometry.attributes.position;
+            const colAttr = terrainMesh.geometry.attributes.color;
+            const normAttr = terrainMesh.geometry.attributes.normal;
+            const c = new THREE.Color();
+
+            for (let i = 0; i < posAttr.count; i++) {
+                const vx = posAttr.getX(i);
+                const vy = posAttr.getY(i);
+                const vz = posAttr.getZ(i);
+                const ny = normAttr ? normAttr.getY(i) : 1.0;
+
+                if (vy < 0.38) {
+                    c.setRGB(0.82 - tEvil * 0.42, 0.74 - tEvil * 0.45, 0.50 - tEvil * 0.32);
+                } else if (vy > 10.5 && vz > 65) {
+                    c.setRGB(0.96, 0.26, 0.06);
+                } else if (vy > 6.8 || ny < 0.72) {
+                    if (seasonIdx === 3 || vy > 10.2) {
+                        c.setRGB(0.92 - tEvil * 0.3, 0.95 - tEvil * 0.35, 0.98 - tEvil * 0.35);
+                    } else {
+                        c.setRGB(0.46 - tEvil * 0.2, 0.45 - tEvil * 0.24, 0.50 - tEvil * 0.24);
+                    }
+                } else {
+                    const distGreek = Math.hypot(vx, vz);
+                    const inInfluence = distGreek < GameState.influenceRadius ? 1.0 : 0.45;
+                    const gFactor = tGood * inInfluence;
+                    const eFactor = tEvil * inInfluence;
+
+                    let baseR = 0.26, baseG = 0.58, baseB = 0.24;
+                    if (seasonIdx === 0) { baseR = 0.24; baseG = 0.64; baseB = 0.28; }
+                    else if (seasonIdx === 1) { baseR = 0.34; baseG = 0.58; baseB = 0.22; }
+                    else if (seasonIdx === 2) { baseR = 0.52; baseG = 0.46; baseB = 0.20; }
+                    else if (seasonIdx === 3) { baseR = 0.74; baseG = 0.82; baseB = 0.86; }
+
+                    const crack = (eFactor > 0.3 && Math.sin(vx * 0.45) * Math.cos(vz * 0.45) > 0.82) ? eFactor : 0;
+                    if (crack > 0) {
+                        c.setRGB(0.95, 0.22, 0.05);
+                    } else {
+                        c.setRGB(
+                            Math.min(1, Math.max(0.08, baseR - eFactor * 0.14 + gFactor * 0.06)),
+                            Math.min(1, Math.max(0.08, baseG - eFactor * 0.36 + gFactor * 0.20)),
+                            Math.min(1, Math.max(0.08, baseB - eFactor * 0.14 + gFactor * 0.10))
+                        );
+                    }
+                }
+                colAttr.setXYZ(i, c.r, c.g, c.b);
+            }
+            colAttr.needsUpdate = true;
+
+            WorldEntities.resources.forEach(r => {
+                if (r.resourceType === 'tree' && r.mesh && r.mesh.userData.foliageMat) {
+                    const fMat = r.mesh.userData.foliageMat;
+                    if (seasonIdx === 0) fMat.color.setHex(r.mesh.userData.isCherry ? 0xf472b6 : 0x16a34a);
+                    else if (seasonIdx === 1) fMat.color.setHex(0x15803d);
+                    else if (seasonIdx === 2) fMat.color.setHex(0xd97706);
+                    else if (seasonIdx === 3) fMat.color.setHex(0xe2e8f0);
+                }
+            });
+
+            if (influenceRingMesh) {
+                influenceRingMesh.material.color.setHex(align >= 25 ? 0xfacc15 : (align <= -25 ? 0xf43f5e : 0x22c55e));
+            }
+        }
+
+        /**********************************************************************
+         * 5. POPULATING THE ISLAND (Nomad Origin, Props, Tribes, Creature)
+         **********************************************************************/
+        function populateInitialIsland() {
+            createBuildingEntity('temple', new THREE.Vector3(0, 0, -6), 'greek', true);
+            createBuildingEntity('altar', new THREE.Vector3(0, 0, 3.5), 'greek', true);
+            createBuildingEntity('storehouse', new THREE.Vector3(-11, 0, -2), 'greek', true);
+            createBuildingEntity('house', new THREE.Vector3(10, 0, -2), 'greek', true);
+            createBuildingEntity('house', new THREE.Vector3(12, 0, 5), 'greek', true);
+
+            Object.values(GameState.tribes).forEach(tribe => createTribeCapitalMesh(tribe));
+            populateDetailedTerrainProps();
+
+            const treeSpots = [
+                [-25, -14], [-28, -18], [-22, -20], [24, 14], [28, 18],
+                [-16, -42], [22, -38], [-40, 18], [45, 25], [68, -16], [-55, -25]
+            ];
+            treeSpots.forEach(([tx, tz]) => {
+                for (let k = 0; k < 3; k++) {
+                    spawnResourceNode('tree', new THREE.Vector3(tx + (Math.random() - 0.5) * 7, 0, tz + (Math.random() - 0.5) * 7));
+                }
+            });
+
+            const oreSpots = [[-24, 6], [-26, 9], [26, -6], [-8, -36], [36, 36], [-35, -32]];
+            oreSpots.forEach(([rx, rz]) => spawnResourceNode('ore', new THREE.Vector3(rx, 0, rz)));
+
+            const initialRoles = ['worshipper', 'woodcutter', 'farmer', 'miner', 'idle'];
+            initialRoles.forEach((role, idx) => {
+                const a = (idx / initialRoles.length) * Math.PI * 2;
+                spawnVillager(new THREE.Vector3(Math.cos(a) * 7, 0, Math.sin(a) * 7 + 3), role);
+            });
+
+            spawnPlatoon('vikings', new THREE.Vector3(0, 0, -76), false);
+            spawnPlatoon('japanese', new THREE.Vector3(74, 0, -8), false);
+            spawnPlatoon('aztecs', new THREE.Vector3(8, 0, 74), false);
+
+            buildCreature3DMesh(GameState.creature.species);
+            GameState.quests.forEach(q => createQuestScroll3D(q));
+
+            renderTribesStatusUI();
+            renderScrollsUI();
+            renderTributeShopUI();
+            renderDiscordPartyUI();
+            updateEraArchitectureVisuals();
+        }
+
+        function populateDetailedTerrainProps() {
+            const rockMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.85, flatShading: true });
+            const ruinMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.6 });
+            const crystalMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x0284c7, emissiveIntensity: 0.65 });
+
+            [[-14, -22, 2.2], [-20, -52, 2.8], [18, -58, 2.4], [42, -28, 2.6], [-48, 42, 3.1], [54, 48, 2.5]].forEach(([bx, bz, s]) => {
+                const by = getTerrainHeight(bx, bz);
+                const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(s, 1), rockMat);
+                rock.position.set(bx, by + s * 0.4, bz);
+                rock.scale.set(1.2, 0.75, 1.0);
+                rock.castShadow = true;
+                scene.add(rock);
+            });
+
+            [[-42, -18], [38, -22], [-28, 38]].forEach(([rx, rz]) => {
+                const ry = getTerrainHeight(rx, rz);
+                const rGroup = new THREE.Group();
+                rGroup.position.set(rx, ry, rz);
+                for (let c = 0; c < 3; c++) {
+                    const col = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.48, 3.2 - c * 0.6, 10), ruinMat);
+                    col.position.set((c - 1) * 2.1, (3.2 - c * 0.6) * 0.5, 0);
+                    col.castShadow = true;
+                    rGroup.add(col);
+                }
+                scene.add(rGroup);
+            });
+
+            [[-16, -28], [-22, 16], [18, 28]].forEach(([cx, cz]) => {
+                const cy = getTerrainHeight(cx, cz);
+                const cluster = new THREE.Group();
+                cluster.position.set(cx, cy, cz);
+                for (let k = 0; k < 3; k++) {
+                    const shard = new THREE.Mesh(new THREE.OctahedronGeometry(0.75, 0), crystalMat);
+                    shard.scale.set(0.6, 2.2, 0.6);
+                    shard.position.set((k - 1) * 0.6, 0.9, (k % 2) * 0.4);
+                    cluster.add(shard);
+                }
+                scene.add(cluster);
+            });
+        }
+
+        function createBuildingEntity(type, pos, tribe = 'greek', completed = true) {
+            const y = getTerrainHeight(pos.x, pos.z);
+            const group = new THREE.Group();
+            group.position.set(pos.x, y, pos.z);
+
+            const marbleMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.45 });
+            const roofMat = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.6 });
+            const goldMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.6, roughness: 0.25 });
+            const darkMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.7 });
+
+            if (type === 'temple') {
+                const base = new THREE.Mesh(new THREE.BoxGeometry(8, 1.4, 8), marbleMat);
+                base.position.y = 0.7;
+                group.add(base);
+                for (let cx = -2.8; cx <= 2.8; cx += 2.8) {
+                    for (let cz = -2.8; cz <= 2.8; cz += 5.6) {
+                        const col = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.45, 4.2, 10), marbleMat);
+                        col.position.set(cx, 3.2, cz);
+                        group.add(col);
+                    }
+                }
+                const roof = new THREE.Mesh(new THREE.ConeGeometry(6.2, 2.6, 4), goldMat);
+                roof.rotation.y = Math.PI / 4;
+                roof.position.y = 6.5;
+                group.add(roof);
+                const crystal = new THREE.Mesh(
+                    new THREE.OctahedronGeometry(1.0, 0),
+                    new THREE.MeshStandardMaterial({ color: 0xa855f7, emissive: 0x9333ea, emissiveIntensity: 0.8 })
+                );
+                crystal.position.y = 9.0;
+                group.add(crystal);
+                group.userData.manaCrystal = crystal;
+            } else if (type === 'altar') {
+                const base = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.8, 1.2, 12), darkMat);
+                base.position.y = 0.6;
+                group.add(base);
+                const bowl = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 0.8, 0.8, 12), new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0xdc2626, emissiveIntensity: 0.6 }));
+                bowl.position.y = 1.5;
+                group.add(bowl);
+            } else if (type === 'house') {
+                const body = new THREE.Mesh(new THREE.BoxGeometry(3.4, 2.4, 3.4), marbleMat);
+                body.position.y = 1.2;
+                group.add(body);
+                const roof = new THREE.Mesh(new THREE.ConeGeometry(2.9, 1.6, 4), roofMat);
+                roof.rotation.y = Math.PI / 4;
+                roof.position.y = 3.2;
+                group.add(roof);
+            } else if (type === 'farm') {
+                const field = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.3, 5.2), new THREE.MeshStandardMaterial({ color: 0xeab308, roughness: 0.9 }));
+                field.position.y = 0.15;
+                group.add(field);
+            } else if (type === 'storehouse') {
+                const body = new THREE.Mesh(new THREE.BoxGeometry(4.8, 2.8, 4.2), marbleMat);
+                body.position.y = 1.4;
+                group.add(body);
+                const roof = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.6, 4.6), goldMat);
+                roof.position.y = 3.0;
+                group.add(roof);
+            } else if (type === 'barracks') {
+                const body = new THREE.Mesh(new THREE.BoxGeometry(5.0, 3.2, 5.0), darkMat);
+                body.position.y = 1.6;
+                group.add(body);
+                const crest = new THREE.Mesh(new THREE.ConeGeometry(3.2, 2.0, 6), new THREE.MeshStandardMaterial({ color: 0xdc2626 }));
+                crest.position.y = 4.2;
+                group.add(crest);
+            } else if (type === 'garden') {
+                const basin = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.4, 0.8, 16), marbleMat);
+                basin.position.y = 0.4;
+                group.add(basin);
+                const water = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 1.8, 0.9, 16), new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x0284c7, emissiveIntensity: 0.4 }));
+                water.position.y = 0.6;
+                group.add(water);
+            } else if (type === 'spikes') {
+                for (let k = 0; k < 5; k++) {
+                    const spike = new THREE.Mesh(new THREE.ConeGeometry(0.45, 3.2, 6), darkMat);
+                    spike.position.set((k - 2) * 0.7, 1.6, (k % 2) * 0.6);
+                    group.add(spike);
+                }
+            } else if (type === 'obelisk') {
+                const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 1.1, 8.5, 4), goldMat);
+                shaft.position.y = 4.25;
+                group.add(shaft);
+            }
+
+            group.traverse(obj => { if (obj.isMesh) { obj.castShadow = true; obj.receiveShadow = true; } });
+            if (!completed) group.scale.set(0.4, 0.4, 0.4);
+            scene.add(group);
+
+            const bld = {
+                id: 'bld_' + Math.random().toString(36).slice(2, 8),
+                type,
+                tribe,
+                pos: group.position,
+                mesh: group,
+                completed,
+                progress: completed ? 100 : 35
+            };
+            WorldEntities.buildings.push(bld);
+            return bld;
+        }
+
+        function createTribeCapitalMesh(tribe) {
+            const y = getTerrainHeight(tribe.pos.x, tribe.pos.z);
+            tribe.pos.y = y;
+            const group = new THREE.Group();
+            group.position.copy(tribe.pos);
+
+            const mat = new THREE.MeshStandardMaterial({ color: tribe.color, roughness: 0.5 });
+            const fort = new THREE.Mesh(new THREE.BoxGeometry(7, 4.5, 7), mat);
+            fort.position.y = 2.25;
+            group.add(fort);
+
+            const tower = new THREE.Mesh(new THREE.ConeGeometry(5.5, 3.5, 4), new THREE.MeshStandardMaterial({ color: 0xfacc15 }));
+            tower.position.y = 6.2;
+            tower.rotation.y = Math.PI / 4;
+            group.add(tower);
+
+            group.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+            scene.add(group);
+            tribe.mesh = group;
+        }
+
+        function spawnResourceNode(type, pos) {
+            const y = getTerrainHeight(pos.x, pos.z);
+            const group = new THREE.Group();
+            group.position.set(pos.x, y, pos.z);
+
+            if (type === 'tree') {
+                const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.42, 2.2, 7), new THREE.MeshStandardMaterial({ color: 0x78350f }));
+                trunk.position.y = 1.1;
+                group.add(trunk);
+                const isCherry = pos.x > 45;
+                const foliageMat = new THREE.MeshStandardMaterial({ color: isCherry ? 0xf472b6 : 0x16a34a, roughness: 0.75 });
+                const crown = new THREE.Mesh(new THREE.ConeGeometry(1.7, 3.6, 7), foliageMat);
+                crown.position.y = 3.2;
+                group.add(crown);
+                group.userData.foliageMat = foliageMat;
+                group.userData.isCherry = isCherry;
+            } else {
+                const ore = new THREE.Mesh(new THREE.DodecahedronGeometry(1.35, 0), new THREE.MeshStandardMaterial({ color: 0x38bdf8, metalness: 0.5, roughness: 0.3 }));
+                ore.position.y = 0.9;
+                group.add(ore);
+            }
+
+            group.traverse(o => { if (o.isMesh) o.castShadow = true; });
+            const node = {
+                id: 'res_' + Math.random().toString(36).slice(2, 8),
+                pickableType: 'resource',
+                resourceType: type,
+                amount: type === 'tree' ? 40 : 45,
+                pos: group.position,
+                mesh: group
+            };
+            group.userData.entityRef = node;
+            scene.add(group);
+            WorldEntities.resources.push(node);
+            return node;
+        }
+
+        function spawnVillager(pos, job = 'idle') {
+            const y = getTerrainHeight(pos.x, pos.z);
+            const group = new THREE.Group();
+            group.position.set(pos.x, y, pos.z);
+
+            const tunicColors = {
+                worshipper: 0xa855f7,
+                farmer: 0xeab308,
+                woodcutter: 0x22c55e,
+                miner: 0x38bdf8,
+                breeder: 0xf472b6,
+                idle: 0xf8fafc
+            };
+            const bodyMat = new THREE.MeshStandardMaterial({ color: tunicColors[job] || 0xf8fafc });
+            const body = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.42, 1.2, 8), bodyMat);
+            body.position.y = 0.6;
+            group.add(body);
+
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 8, 8), new THREE.MeshStandardMaterial({ color: 0xfde68a }));
+            head.position.y = 1.42;
+            group.add(head);
+
+            group.traverse(o => { if (o.isMesh) o.castShadow = true; });
+            const villager = {
+                id: 'vil_' + Math.random().toString(36).slice(2, 8),
+                pickableType: 'villager',
+                job,
+                pos: group.position,
+                targetPos: new THREE.Vector3(pos.x, y, pos.z),
+                mesh: group,
+                bodyMat,
+                timer: Math.random() * 3
+            };
+            group.userData.entityRef = villager;
+            scene.add(group);
+            WorldEntities.villagers.push(villager);
+            return villager;
+        }
+
+        function setVillagerJob(villager, newJob) {
+            villager.job = newJob;
+            const tunicColors = {
+                worshipper: 0xa855f7,
+                farmer: 0xeab308,
+                woodcutter: 0x22c55e,
+                miner: 0x38bdf8,
+                breeder: 0xf472b6,
+                idle: 0xf8fafc
+            };
+            if (villager.bodyMat) villager.bodyMat.color.setHex(tunicColors[newJob] || 0xf8fafc);
+        }
+
+        function spawnPlatoon(faction, pos, isPlayer) {
+            const y = getTerrainHeight(pos.x, pos.z);
+            const group = new THREE.Group();
+            group.position.set(pos.x, y, pos.z);
+
+            const color = isPlayer ? 0xfacc15 : 0xef4444;
+            const mat = new THREE.MeshStandardMaterial({ color, metalness: 0.4, roughness: 0.4 });
+            for (let rx = -1; rx <= 1; rx++) {
+                for (let rz = -1; rz <= 0; rz++) {
+                    const soldier = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.4, 1.5, 8), mat);
+                    soldier.position.set(rx * 1.2, 0.75, rz * 1.2);
+                    group.add(soldier);
+                }
+            }
+            const banner = new THREE.Mesh(new THREE.BoxGeometry(0.2, 3.2, 0.9), new THREE.MeshBasicMaterial({ color }));
+            banner.position.set(0, 2.0, 0);
+            group.add(banner);
+
+            scene.add(group);
+            const platoon = {
+                id: 'plt_' + Math.random().toString(36).slice(2, 8),
+                faction,
+                pos: group.position,
+                targetPos: pos.clone(),
+                hp: 120,
+                mesh: group
+            };
+            WorldEntities.platoons.push(platoon);
+            return platoon;
+        }
+
+        function buildCreature3DMesh(species) {
+            if (creatureMeshGroup) scene.remove(creatureMeshGroup);
+
+            const specs = {
+                lion:  { name: 'Titanen-Löwe', icon: '🦁', color: 0xf59e0b, mane: 0x92400e },
+                wolf:  { name: 'Fenris-Wolf',  icon: '🐺', color: 0x94a3b8, mane: 0x334155 },
+                ape:   { name: 'Weiser Titanen-Affe', icon: '🦍', color: 0x57534e, mane: 0x292524 },
+                tiger: { name: 'Sturm-Tiger',  icon: '🐯', color: 0xf97316, mane: 0x1e293b },
+                cow:   { name: 'Heilige Kuh',  icon: '🐮', color: 0xf8fafc, mane: 0xf472b6 }
+            };
+            const sp = specs[species] || specs.lion;
+            GameState.creature.species = species;
+            GameState.creature.name = sp.name;
+            GameState.creature.icon = sp.icon;
+
+            const group = new THREE.Group();
+            const bodyMat = new THREE.MeshStandardMaterial({ color: sp.color, roughness: 0.55 });
+            const maneMat = new THREE.MeshStandardMaterial({ color: sp.mane, roughness: 0.7 });
+
+            const torso = new THREE.Mesh(new THREE.BoxGeometry(2.8, 3.4, 2.2), bodyMat);
+            torso.position.y = 2.8;
+            group.add(torso);
+
+            const mane = new THREE.Mesh(new THREE.DodecahedronGeometry(1.65, 1), maneMat);
+            mane.position.set(0, 4.9, 0.3);
+            group.add(mane);
+
+            const head = new THREE.Mesh(new THREE.BoxGeometry(1.7, 1.6, 1.8), bodyMat);
+            head.position.set(0, 5.0, 0.6);
+            group.add(head);
+
+            const legL = new THREE.Mesh(new THREE.BoxGeometry(0.8, 2.0, 0.8), bodyMat);
+            legL.position.set(-0.8, 1.0, 0);
+            group.add(legL);
+
+            const legR = new THREE.Mesh(new THREE.BoxGeometry(0.8, 2.0, 0.8), bodyMat);
+            legR.position.set(0.8, 1.0, 0);
+            group.add(legR);
+
+            const halo = new THREE.Mesh(
+                new THREE.TorusGeometry(1.3, 0.12, 8, 24),
+                new THREE.MeshBasicMaterial({ color: 0xfacc15 })
+            );
+            halo.rotation.x = Math.PI / 2;
+            halo.position.y = 6.8;
+            group.add(halo);
+
+            group.traverse(o => { if (o.isMesh) o.castShadow = true; });
+            const cy = getTerrainHeight(GameState.creature.pos.x, GameState.creature.pos.z);
+            group.position.set(GameState.creature.pos.x, cy, GameState.creature.pos.z);
+            group.scale.setScalar(GameState.creature.scale);
+
+            creatureMeshGroup = group;
+            scene.add(group);
+
+            const badge = document.getElementById('creature-avatar-badge');
+            const nameEl = document.getElementById('creature-name-display');
+            const startBanner = document.getElementById('selected-creature-banner');
+            if (badge) badge.textContent = sp.icon;
+            if (nameEl) nameEl.textContent = sp.name;
+            if (startBanner) startBanner.textContent = `Aktuell gewählt: ${sp.icon} ${sp.name}`;
+        }
+
+        function createQuestScroll3D(quest) {
+            const y = getTerrainHeight(quest.pos.x, quest.pos.z);
+            quest.pos.y = y;
+            const mesh = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.55, 0.55, 2.2, 12),
+                new THREE.MeshStandardMaterial({ color: 0xfacc15, emissive: 0xd97706, emissiveIntensity: 0.6 })
+            );
+            mesh.position.set(quest.pos.x, y + 2.4, quest.pos.z);
+            mesh.rotation.z = Math.PI / 6;
+            mesh.userData.questRef = quest;
+            scene.add(mesh);
+            WorldEntities.scrollMeshes.push(mesh);
+        }
+
+        /**********************************************************************
+         * 6. HAND OF GOD INTERACTION & RIGHT-CLICK GESTURE RECOGNIZER
+         **********************************************************************/
+        let heldEntity = null;
+        let lastHandWorldPos = new THREE.Vector3();
+        let handVelocity = new THREE.Vector3();
+        let isDrawingGesture = false;
+        let gesturePoints = [];
+        let gestureCanvas, gestureCtx;
+
+        function initInputHandlers() {
+            gestureCanvas = document.getElementById('gesture-canvas');
+            gestureCtx = gestureCanvas.getContext('2d');
+            resizeGestureCanvas();
+
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                resizeGestureCanvas();
+            });
+
+            window.addEventListener('keydown', (e) => {
+                CameraController.keys[e.key.toLowerCase()] = true;
+                if (!GameState.started) return;
+                if (e.key === '1') selectMiracleType('water');
+                if (e.key === '2') selectMiracleType('heal');
+                if (e.key === '3') selectMiracleType('fireball');
+                if (e.key === '4') selectMiracleType('lightning');
+                if (e.key === '5') selectMiracleType('volcano');
+                if (e.key === 'Escape') setInteractionMode('hand');
+            });
+
+            window.addEventListener('keyup', (e) => {
+                CameraController.keys[e.key.toLowerCase()] = false;
+            });
+
+            const domEl = renderer.domElement;
+
+            domEl.addEventListener('wheel', (e) => {
+                CameraController.distance = THREE.MathUtils.clamp(CameraController.distance + e.deltaY * 0.05, 26, 155);
+                notifyTutorialAction('camera_moved');
+            });
+
+            domEl.addEventListener('mousemove', (e) => {
+                mouseNDC.x = (e.clientX / window.innerWidth) * 2 - 1;
+                mouseNDC.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+                if (CameraController.isMiddleDragging) {
+                    const dx = e.clientX - CameraController.prevMouse.x;
+                    const dy = e.clientY - CameraController.prevMouse.y;
+                    CameraController.yaw -= dx * 0.007;
+                    CameraController.pitch = THREE.MathUtils.clamp(CameraController.pitch + dy * 0.006, 0.28, 1.35);
+                    CameraController.prevMouse = { x: e.clientX, y: e.clientY };
+                    notifyTutorialAction('camera_moved');
+                }
+
+                if (isDrawingGesture) {
+                    gesturePoints.push({ x: e.clientX, y: e.clientY });
+                    drawGestureTrail();
+                }
+            });
+
+            domEl.addEventListener('mousedown', (e) => {
+                if (!GameState.started) return;
+                if (e.button === 1) {
+                    CameraController.isMiddleDragging = true;
+                    CameraController.prevMouse = { x: e.clientX, y: e.clientY };
+                    return;
+                }
+                if (e.button === 2) {
+                    isDrawingGesture = true;
+                    gesturePoints = [{ x: e.clientX, y: e.clientY }];
+                    return;
+                }
+                if (e.button === 0) {
+                    handleLeftMouseDown();
+                }
+            });
+
+            window.addEventListener('mouseup', (e) => {
+                if (e.button === 1) CameraController.isMiddleDragging = false;
+                if (e.button === 2 && isDrawingGesture) {
+                    isDrawingGesture = false;
+                    recognizeAndCastGesture();
+                    gestureCtx.clearRect(0, 0, gestureCanvas.width, gestureCanvas.height);
+                }
+            });
+        }
+
+        function resizeGestureCanvas() {
+            if (!gestureCanvas) return;
+            gestureCanvas.width = window.innerWidth;
+            gestureCanvas.height = window.innerHeight;
+        }
+
+        function drawGestureTrail() {
+            if (!gestureCtx || gesturePoints.length < 2) return;
+            gestureCtx.clearRect(0, 0, gestureCanvas.width, gestureCanvas.height);
+            gestureCtx.save();
+            gestureCtx.strokeStyle = '#38bdf8';
+            gestureCtx.shadowColor = '#facc15';
+            gestureCtx.shadowBlur = 16;
+            gestureCtx.lineWidth = 5;
+            gestureCtx.lineCap = 'round';
+            gestureCtx.beginPath();
+            gesturePoints.forEach((p, idx) => {
+                if (idx === 0) gestureCtx.moveTo(p.x, p.y);
+                else gestureCtx.lineTo(p.x, p.y);
+            });
+            gestureCtx.stroke();
+            gestureCtx.restore();
+        }
+
+        function recognizeAndCastGesture() {
+            if (gesturePoints.length < 8) return;
+            let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+            gesturePoints.forEach(p => {
+                if (p.x < minX) minX = p.x;
+                if (p.x > maxX) maxX = p.x;
+                if (p.y < minY) minY = p.y;
+                if (p.y > maxY) maxY = p.y;
+            });
+            const width = maxX - minX;
+            const height = maxY - minY;
+            if (width < 25 && height < 25) return;
+
+            const startPt = gesturePoints[0];
+            const endPt = gesturePoints[gesturePoints.length - 1];
+            const startEndDist = Math.hypot(endPt.x - startPt.x, endPt.y - startPt.y);
+
+            let dirChangesX = 0;
+            for (let i = 2; i < gesturePoints.length; i += 2) {
+                const dx1 = gesturePoints[i - 1].x - gesturePoints[i - 2].x;
+                const dx2 = gesturePoints[i].x - gesturePoints[i - 1].x;
+                if (dx1 * dx2 < -4) dirChangesX++;
+            }
+
+            let miracle = 'water';
+            if (height > width * 1.45 && dirChangesX >= 2) {
+                miracle = 'lightning';
+            } else if (startEndDist < Math.max(width, height) * 0.42) {
+                miracle = gesturePoints.length > 35 ? 'volcano' : 'fireball';
+            } else if (Math.abs(width - height) < 45) {
+                miracle = 'heal';
+            }
+
+            const hitPos = getRayTerrainIntersection();
+            if (hitPos) castMiracleAt(miracle, hitPos);
+        }
+
+        function getRayTerrainIntersection() {
+            if (!terrainMesh) return null;
+            raycaster.setFromCamera(mouseNDC, camera);
+            const hits = raycaster.intersectObject(terrainMesh);
+            return hits.length > 0 ? hits[0].point : null;
+        }
+
+        function handleLeftMouseDown() {
+            const hitPos = getRayTerrainIntersection();
+            if (!hitPos) return;
+
+            // Check if clicking a 3D Quest Scroll
+            raycaster.setFromCamera(mouseNDC, camera);
+            const scrollHits = raycaster.intersectObjects(WorldEntities.scrollMeshes);
+            if (scrollHits.length > 0) {
+                const q = scrollHits[0].object.userData.questRef;
+                if (q && !q.completed) {
+                    completeQuestScroll(q);
+                    return;
+                }
+            }
+
+            if (GameState.interactionMode === 'build' && GameState.selectedBuildingType) {
+                tryPlaceBuilding(GameState.selectedBuildingType, hitPos);
+                return;
+            }
+
+            if (GameState.interactionMode === 'miracle' && GameState.selectedMiracleType) {
+                castMiracleAt(GameState.selectedMiracleType, hitPos);
+                setInteractionMode('hand');
+                return;
+            }
+
+            // Hand Mode: If already holding an entity, drop or throw it!
+            if (heldEntity) {
+                const speed = handVelocity.length();
+                if (speed > 18) {
+                    // Ballistic Throw
+                    SoundFX.throwObj();
+                    WorldEntities.thrownObjects.push({
+                        entity: heldEntity,
+                        vel: handVelocity.clone().multiplyScalar(0.55).add(new THREE.Vector3(0, 12, 0))
+                    });
+                } else {
+                    // Gentle Drop & Contextual Assignment
+                    SoundFX.drop();
+                    const gy = getTerrainHeight(hitPos.x, hitPos.z);
+                    heldEntity.pos.set(hitPos.x, gy, hitPos.z);
+                    if (heldEntity.pickableType === 'villager') {
+                        handleVillagerDroppedAt(heldEntity, hitPos);
+                    } else if (heldEntity.pickableType === 'resource') {
+                        handleResourceDroppedAt(heldEntity, hitPos);
+                    }
+                }
+                heldEntity = null;
+                document.getElementById('held-object-info').innerHTML = 'Hand ist leer. <b>Linksklick</b> auf Bewohner, Baum oder Erz zum Greifen.';
+                return;
+            }
+
+            // Otherwise try to pick up nearest Villager or Resource Node
+            let nearest = null;
+            let bestDist = 6.0;
+            [...WorldEntities.villagers, ...WorldEntities.resources].forEach(ent => {
+                const d = Math.hypot(ent.pos.x - hitPos.x, ent.pos.z - hitPos.z);
+                if (d < bestDist) {
+                    bestDist = d;
+                    nearest = ent;
+                }
+            });
+
+            if (nearest) {
+                heldEntity = nearest;
+                SoundFX.grab();
+                const label = nearest.pickableType === 'villager'
+                    ? `Bewohner (${nearest.job}) — Am Tempel, Haus, Feld oder Altar ablegen!`
+                    : `Rohstoff (${nearest.resourceType === 'tree' ? 'Baum' : 'Erzfelsen'}) — Am Lagerhaus ablegen!`;
+                document.getElementById('held-object-info').innerHTML = `<span class="text-amber-300 font-semibold">${label}</span>`;
+            }
+        }
+
+        function handleVillagerDroppedAt(villager, dropPos) {
+            let nearestBld = null;
+            let minDist = 8.5;
+            WorldEntities.buildings.forEach(b => {
+                if (b.tribe === 'greek') {
+                    const d = Math.hypot(b.pos.x - dropPos.x, b.pos.z - dropPos.z);
+                    if (d < minDist) { minDist = d; nearestBld = b; }
+                }
+            });
+
+            if (nearestBld) {
+                if (nearestBld.type === 'altar') {
+                    GameState.resources.mana += 200;
+                    addFaithProgress(18);
+                    scene.remove(villager.mesh);
+                    WorldEntities.villagers = WorldEntities.villagers.filter(v => v !== villager);
+                    SoundFX.miracleEvil();
+                    spawn3DParticleBurst(dropPos, 0xf43f5e, 26);
+                    changeAlignment(-15, 'Opfer am Altar dargebracht! +200 Mana & +18 Ehrfurcht-Glaube.');
+                    notifyTutorialAction('villager_assigned');
+                    updateHUD();
+                    return;
+                } else if (nearestBld.type === 'temple') {
+                    setVillagerJob(villager, 'worshipper');
+                    addFaithProgress(15);
+                    changeAlignment(3, 'Neuer Priester betet am Heiligen Schrein (+15 Glaube)!');
+                    spawn3DParticleBurst(dropPos, 0xa855f7, 14);
+                    notifyTutorialAction('villager_assigned');
+                    return;
+                } else if (nearestBld.type === 'farm') {
+                    setVillagerJob(villager, 'farmer');
+                    addFaithProgress(6);
+                    notifyTutorialAction('villager_assigned');
+                    return;
+                } else if (nearestBld.type === 'house') {
+                    setVillagerJob(villager, 'breeder');
+                    addFaithProgress(6);
+                    notifyTutorialAction('villager_assigned');
+                    return;
+                }
+            }
+
+            const nearRes = WorldEntities.resources.find(r => Math.hypot(r.pos.x - dropPos.x, r.pos.z - dropPos.z) < 8);
+            if (nearRes) {
+                setVillagerJob(villager, nearRes.resourceType === 'tree' ? 'woodcutter' : 'miner');
+                addFaithProgress(5);
+                notifyTutorialAction('villager_assigned');
+            }
+        }
+
+        function handleResourceDroppedAt(resNode, dropPos) {
+            const nearBld = WorldEntities.buildings.find(b => b.tribe === 'greek' && Math.hypot(b.pos.x - dropPos.x, b.pos.z - dropPos.z) < 10);
+            if (nearBld) {
+                const amount = resNode.amount * GameState.handCarryBonus;
+                if (!nearBld.completed) {
+                    nearBld.completed = true;
+                    nearBld.progress = 100;
+                    nearBld.mesh.scale.setScalar(1);
+                    SoundFX.build();
+                } else if (resNode.resourceType === 'tree') {
+                    GameState.resources.wood += amount;
+                } else {
+                    GameState.resources.ore += amount;
+                }
+                addFaithProgress(10);
+                notifyTutorialAction('resource_stored');
+                SoundFX.praise();
+                spawn3DParticleBurst(dropPos, 0xfacc15, 16);
+                const a = Math.random() * Math.PI * 2;
+                const d = 26 + Math.random() * 18;
+                resNode.pos.set(Math.cos(a) * d, getTerrainHeight(Math.cos(a) * d, Math.sin(a) * d), Math.sin(a) * d);
+                updateHUD();
+            }
+        }
+
+        /**********************************************************************
+         * 7. MIRACLES, CITY BUILDING & 3D PARTICLE SYSTEM
+         **********************************************************************/
+        function setInteractionMode(mode) {
+            GameState.interactionMode = mode;
+            if (mode === 'hand') {
+                GameState.selectedBuildingType = null;
+                GameState.selectedMiracleType = null;
+                if (buildPreviewMesh) buildPreviewMesh.visible = false;
+                document.getElementById('hand-mode-badge').textContent = 'Greifen & Werfen';
+            }
+        }
+
+        function selectBuildType(type) {
+            GameState.interactionMode = 'build';
+            GameState.selectedBuildingType = type;
+            if (buildPreviewMesh) buildPreviewMesh.visible = true;
+            document.getElementById('hand-mode-badge').textContent = 'Bauen: ' + BUILDING_CATALOG[type].name;
+            SoundFX.grab();
+        }
+
+        function selectMiracleType(type) {
+            GameState.interactionMode = 'miracle';
+            GameState.selectedMiracleType = type;
+            if (buildPreviewMesh) buildPreviewMesh.visible = false;
+            document.getElementById('hand-mode-badge').textContent = 'Wunder: ' + type.toUpperCase();
+            SoundFX.grab();
+        }
+
+        function tryPlaceBuilding(type, pos) {
+            const spec = BUILDING_CATALOG[type];
+            if (!spec) return;
+            if (Math.hypot(pos.x, pos.z) > GameState.influenceRadius) {
+                triggerAdvisor('devil', 'Du kannst nur innerhalb deines leuchtenden Einflussbereichs bauen! Steigere deinen Glauben für mehr Reichweite.');
+                return;
+            }
+            if (GameState.resources.wood < spec.wood || GameState.resources.ore < spec.ore) {
+                triggerAdvisor('angel', `Nicht genug Rohstoffe für ${spec.name}! Sammle Holz oder Erz mit der Hand Gottes.`);
+                return;
+            }
+
+            GameState.resources.wood -= spec.wood;
+            GameState.resources.ore -= spec.ore;
+            GameState.resources.impressiveness += spec.impress;
+            GameState.resources.maxPop += spec.popBonus;
+
+            createBuildingEntity(type, pos, 'greek', false);
+            SoundFX.build();
+            spawn3DParticleBurst(pos, 0xfacc15, 20);
+            addFaithProgress(20);
+            notifyTutorialAction('building_placed');
+            changeAlignment(spec.alignShift, `${spec.name} errichtet! (+${spec.impress} Eindruck, +20 Glaube)`);
+            setInteractionMode('hand');
+            updateHUD();
+        }
+
+        function castMiracleAt(type, targetPos) {
+            const catalog = {
+                water:     { name: 'Regen-Segen', cost: 35, align: 6, color: 0x38bdf8 },
+                heal:      { name: 'Göttliche Heilung', cost: 45, align: 10, color: 0x4ade80 },
+                fireball:  { name: 'Feuerball', cost: 55, align: -10, color: 0xf97316 },
+                lightning: { name: 'Zorn-Blitzschlag', cost: 70, align: -14, color: 0xfacc15 },
+                volcano:   { name: 'Epischer Vulkan', cost: 150, align: -28, color: 0xef4444 }
+            };
+            const info = catalog[type];
+            if (!info) return;
+            if (GameState.resources.mana < info.cost) {
+                triggerAdvisor('devil', `Zu wenig Mana (${info.cost}✨ benötigt)! Lass Priester am Schrein beten oder opfere am Altar.`);
+                return;
+            }
+
+            GameState.resources.mana -= info.cost;
+            addFaithProgress(22);
+            notifyTutorialAction('miracle_cast');
+            changeAlignment(info.align, `${info.name} gewirkt! (+22 Glaube)`);
+
+            if (type === 'water' || type === 'heal') {
+                SoundFX.miracleGood();
+                GameState.resources.grain += 50;
+                GameState.resources.impressiveness += 20;
+                GameState.creature.hp = Math.min(100, GameState.creature.hp + 30);
+                spawn3DParticleBurst(targetPos.clone().add(new THREE.Vector3(0, 6, 0)), info.color, 36);
+            } else {
+                SoundFX.miracleEvil();
+                spawn3DParticleBurst(targetPos.clone().add(new THREE.Vector3(0, 5, 0)), info.color, 45);
+                const dmg = type === 'volcano' ? 190 : 85;
+                damageNearbyEnemies(targetPos, 24, dmg);
+            }
+            updateHUD();
+        }
+
+        function damageNearbyEnemies(pos, radius, dmg) {
+            WorldEntities.platoons.forEach(p => {
+                if (p.faction !== 'greek' && Math.hypot(p.pos.x - pos.x, p.pos.z - pos.z) < radius) {
+                    p.hp -= dmg;
+                }
+            });
+            Object.values(GameState.tribes).forEach(t => {
+                if (!t.conquered && Math.hypot(t.pos.x - pos.x, t.pos.z - pos.z) < radius + 8) {
+                    t.hp = Math.max(0, t.hp - dmg);
+                    if (t.hp === 0) conquerTribe(t, 'Militärisch unterworfen ⚔️');
+                }
+            });
+            renderTribesStatusUI();
+        }
+
+        function spawn3DParticleBurst(pos, hexColor, count = 20) {
+            const geo = new THREE.SphereGeometry(0.32, 6, 6);
+            const mat = new THREE.MeshBasicMaterial({ color: hexColor });
+            for (let i = 0; i < count; i++) {
+                const m = new THREE.Mesh(geo, mat);
+                m.position.copy(pos);
+                scene.add(m);
+                WorldEntities.particles.push({
+                    mesh: m,
+                    vel: new THREE.Vector3((Math.random() - 0.5) * 14, 5 + Math.random() * 12, (Math.random() - 0.5) * 14),
+                    life: 1.0
+                });
+            }
+        }
+
+        /**********************************************************************
+         * 8. DISCORD SERVER MULTIPLAYER & PANTHEON BRIDGE
+         **********************************************************************/
+        function connectDiscordServer() {
+            const username = document.getElementById('discord-username-input').value.trim() || 'OlympusGod#0001';
+            const serverInvite = document.getElementById('discord-server-input').value.trim() || 'discord.gg/bw-ultra';
+            const webhookUrl = document.getElementById('discord-webhook-input').value.trim();
+
+            GameState.discord.connected = true;
+            GameState.discord.username = username;
+            GameState.discord.serverInvite = serverInvite;
+            GameState.discord.webhookUrl = webhookUrl;
+            GameState.discord.partyMembers[0].name = `🟢 ${username} (Host)`;
+
+            document.getElementById('start-discord-status-text').textContent = `Verbunden: ${serverInvite}`;
+            document.getElementById('discord-feedback-banner').innerHTML =
+                `✅ <b>Discord-Bridge aktiv!</b> Raum <b>${GameState.discord.roomCode}</b> ist mit <b>${serverInvite}</b> synchronisiert.`;
+
+            SoundFX.miracleGood();
+            renderDiscordPartyUI();
+        }
+
+        function simulateFriendJoinDiscord() {
+            const friendNames = ['Ares_Kriegsgott#4412', 'Athena_Weisheit#9081', 'Thor_Nordwind#1337', 'Amaterasu_Sun#7720'];
+            const pick = friendNames[GameState.discord.partyMembers.length % friendNames.length];
+            GameState.discord.partyMembers.push({
+                name: `🟢 ${pick}`,
+                role: 'Verbündete Gottheit (Co-Op)',
+                online: true
+            });
+            SoundFX.praise();
+            renderDiscordPartyUI();
+            document.getElementById('discord-feedback-banner').innerHTML =
+                `🎉 <b>${pick}</b> ist über deinen Discord-Server der Pantheon-Lobby beigetreten!`;
+        }
+
+        function copyDiscordInviteLink() {
+            const inviteText = `⚡ Tritt meinem Black & White Ultra Pantheon bei! Raum-Code: ${GameState.discord.roomCode} | Discord: ${GameState.discord.serverInvite}`;
+            const tempInput = document.createElement('textarea');
+            tempInput.value = inviteText;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+            SoundFX.praise();
+            document.getElementById('discord-feedback-banner').innerHTML =
+                `📋 <b>Einladungs-Text kopiert!</b> Füge ihn mit Strg+V direkt in deinen Discord-Kanal ein.`;
+        }
+
+        async function sendDiscordWebhookTest() {
+            const url = document.getElementById('discord-webhook-input').value.trim();
+            const msg = {
+                username: 'Black & White Ultra • Pantheon Bot',
+                content: `⚡ **${GameState.discord.username}** hat eine neue Götter-Sitzung in **Black & White Ultra** gestartet! Raum-Code: \`${GameState.discord.roomCode}\` • Epoche: \`${ERAS_CATALOG[GameState.era - 1].name}\` • Glaube: \`${Math.floor(GameState.faith)}\``
+            };
+
+            if (url && url.startsWith('https://discord.com/api/webhooks/')) {
+                try {
+                    await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(msg)
+                    });
+                    document.getElementById('discord-feedback-banner').innerHTML =
+                        `📡 <b>Live-Webhook gesendet!</b> Dein Discord-Channel hat die Pantheon-Nachricht empfangen.`;
+                    SoundFX.miracleGood();
+                    return;
+                } catch (e) {}
+            }
+            copyDiscordInviteLink();
+        }
+
+        function sendQuickMultiplayerBlessing() {
+            SoundFX.miracleGood();
+            GameState.resources.mana += 45;
+            GameState.resources.wood += 30;
+            addFaithProgress(15);
+            spawn3DParticleBurst(new THREE.Vector3(0, 10, 0), 0x818cf8, 28);
+            showCosmicBanner('💬', 'DISCORD CO-OP SEGEN EMPFANGEN', 'Deine verbündeten Götter aus dem Discord-Pantheon senden +45 Mana, +30 Holz & +15 Glaube!');
+            updateHUD();
+        }
+
+        function renderDiscordPartyUI() {
+            const hudList = document.getElementById('hud-discord-members');
+            const modalList = document.getElementById('modal-discord-party-list');
+            const html = GameState.discord.partyMembers.map(m => `
+                <div class="flex items-center justify-between bg-slate-950/90 px-2.5 py-1.5 rounded-xl border border-indigo-500/30">
+                    <span class="text-emerald-300 font-semibold text-[11px]">${m.name}</span>
+                    <span class="text-[10px] text-indigo-300">${m.role}</span>
+                </div>
+            `).join('');
+            if (hudList) hudList.innerHTML = html;
+            if (modalList) modalList.innerHTML = html;
+            const codeBadge = document.getElementById('lobby-code-badge');
+            if (codeBadge) codeBadge.textContent = GameState.discord.roomCode;
+        }
+
+        /**********************************************************************
+         * 9. SIMULATION LOOP: FAITH, ERAS, TIME, WEATHER & CREATURE AI
+         **********************************************************************/
+        let economyAccumulator = 0;
+
+        function addFaithProgress(amount) {
+            GameState.faith += amount;
+            checkCivilizationEraAdvancement();
+            updateHUD();
+        }
+
+        function checkCivilizationEraAdvancement() {
+            const currentEraIndex = GameState.era - 1;
+            if (currentEraIndex + 1 < ERAS_CATALOG.length) {
+                const nextEraObj = ERAS_CATALOG[currentEraIndex + 1];
+                if (GameState.faith >= nextEraObj.faithRequired) {
+                    GameState.era = nextEraObj.era;
+                    GameState.nextEraFaith = nextEraObj.nextFaith;
+                    GameState.influenceRadius = Math.max(GameState.influenceRadius, nextEraObj.influenceTarget);
+                    GameState.resources.impressiveness += 75;
+                    GameState.resources.tribute += 80;
+                    updateInfluenceRingGeometry();
+                    updateEraArchitectureVisuals();
+                    SoundFX.miracleGood();
+                    showCosmicBanner('🏛️', `EPOCHEN-AUFSTIEG: ${nextEraObj.name}`, nextEraObj.desc);
+                }
+            }
+        }
+
+        function updateEraArchitectureVisuals() {
+            const era = GameState.era;
+            const eraSpec = ERAS_CATALOG[era - 1] || ERAS_CATALOG[0];
+            const subEl = document.getElementById('hud-era-subtitle');
+            if (subEl) subEl.textContent = eraSpec.shortLabel;
+
+            WorldEntities.buildings.forEach(b => {
+                if (b.tribe === 'greek' && b.mesh && b.completed) {
+                    const scale = b.type === 'temple' ? (0.65 + (era - 1) * 0.16) : (0.82 + (era - 1) * 0.1);
+                    b.mesh.scale.setScalar(scale);
+                }
+            });
+        }
+
+        function cycleTimeSpeed() {
+            const speeds = [1, 2, 4];
+            const idx = (speeds.indexOf(GameState.time.speedMultiplier) + 1) % speeds.length;
+            GameState.time.speedMultiplier = speeds[idx];
+            document.getElementById('btn-time-speed').textContent = `⏩ ${GameState.time.speedMultiplier}x`;
+            SoundFX.grab();
+        }
+
+        function showCosmicBanner(icon, title, desc) {
+            const banner = document.getElementById('cosmic-event-banner');
+            document.getElementById('cosmic-event-icon').textContent = icon;
+            document.getElementById('cosmic-event-title').textContent = title;
+            document.getElementById('cosmic-event-desc').textContent = desc;
+            banner.classList.remove('hidden');
+            setTimeout(() => banner.classList.add('hidden'), 6000);
+        }
+
+        function triggerRandomCosmicOrDisaster() {
+            const events = ['meteor_shower', 'blood_moon', 'solar_blessing', 'drought_quake'];
+            const pick = events[Math.floor(Math.random() * events.length)];
+
+            if (pick === 'meteor_shower') {
+                SoundFX.miracleEvil();
+                GameState.resources.ore += 90;
+                GameState.resources.mana += 80;
+                addFaithProgress(25);
+                showCosmicBanner('☄️', 'KOSMISCHER STERNENFALL', 'Sternschnuppen schlagen auf der Insel ein (+90 Sternen-Erz, +80 Mana, +25 Glaube)!');
+                for (let i = 0; i < 3; i++) {
+                    const rx = (Math.random() - 0.5) * 55;
+                    const rz = (Math.random() - 0.5) * 55;
+                    spawnResourceNode('ore', new THREE.Vector3(rx, 0, rz));
+                }
+            } else if (pick === 'blood_moon') {
+                SoundFX.miracleEvil();
+                GameState.time.hour = 22.5;
+                GameState.resources.mana += 150;
+                addFaithProgress(30);
+                showCosmicBanner('🌑', 'BLUTMOND-KONJUNKTION', 'Der Nachthimmel leuchtet purpurrot! Dein Volk betet voller Ehrfurcht (+150 Mana, +30 Glaube).');
+            } else if (pick === 'solar_blessing') {
+                SoundFX.miracleGood();
+                GameState.resources.grain += 110;
+                GameState.resources.impressiveness += 65;
+                addFaithProgress(30);
+                showCosmicBanner('✨', 'AURORA DES OLYMP', 'Himmlisches Polarlicht segnet deine Ernte (+110 Getreide, +65 Eindruck, +30 Glaube)!');
+            } else {
+                SoundFX.slap();
+                addFaithProgress(20);
+                showCosmicBanner('🌋', 'SEISMISCHES VULKANBEBEN', 'Der Vulkan im Süden grollt! Beschütze deine Siedlung mit Regen- oder Heilungswundern.');
+            }
+            updateHUD();
+        }
+
+        function updateTimeWeatherAndCosmos(dt, elapsed) {
+            const t = GameState.time;
+            const effectiveDt = dt * t.speedMultiplier;
+
+            t.hour += effectiveDt * 0.32;
+            if (t.hour >= 24) {
+                t.hour -= 24;
+                t.dayCount++;
+                if (t.dayCount % 2 === 1) {
+                    t.seasonIndex = (t.seasonIndex + 1) % 4;
+                    if (t.seasonIndex === 0) t.year++;
+                    const curSeason = t.seasons[t.seasonIndex];
+                    updateWorldAlignmentVisuals();
+                    if (GameState.started) {
+                        showCosmicBanner(curSeason.icon, `JAHRESZEIT: ${curSeason.name.toUpperCase()}`, `Deine Zivilisation erlebt den ${curSeason.name} im ${t.year}. Jahr!`);
+                    }
+                }
+            }
+
+            const dayAngle = ((t.hour - 6) / 24) * Math.PI * 2;
+            const sunY = Math.sin(dayAngle) * 145;
+            const sunX = Math.cos(dayAngle) * 145;
+            if (sunLight && sunSphere && moonSphere) {
+                sunLight.position.set(sunX, Math.max(14, sunY), 55);
+                sunSphere.position.set(sunX, sunY, -90);
+                moonSphere.position.set(-sunX, -sunY, -90);
+
+                const daylight = THREE.MathUtils.clamp((sunY + 25) / 110, 0.16, 1.0);
+                sunLight.intensity = daylight * 1.25;
+                ambientLight.intensity = 0.25 + daylight * 0.48;
+
+                const daySky = new THREE.Color(GameState.alignment < -25 ? 0x3b0a14 : 0x68a6d8);
+                const nightSky = new THREE.Color(0x060913);
+                const currentSky = nightSky.clone().lerp(daySky, daylight);
+                scene.background.copy(currentSky);
+                scene.fog.color.copy(currentSky);
+
+                if (starField) starField.material.opacity = Math.max(0, 1 - daylight * 1.6);
+            }
+
+            if (waterMesh) waterMesh.position.y = -0.25 + Math.sin(elapsed * 1.8) * 0.14;
+            if (cloudGroup) {
+                cloudGroup.children.forEach((cl, idx) => {
+                    cl.position.x += (2.0 + (idx % 3) * 0.5) * effectiveDt;
+                    if (cl.position.x > 160) cl.position.x = -160;
+                });
+            }
+
+            t.weatherTimer -= effectiveDt;
+            if (t.weatherTimer <= 0) {
+                t.weatherTimer = 28 + Math.random() * 20;
+                const sId = t.seasons[t.seasonIndex].id;
+                const pool = sId === 'winter' ? ['clear', 'snow', 'snow'] : ['clear', 'rain', 'storm'];
+                t.weather = pool[Math.floor(Math.random() * pool.length)];
+                if (weatherParticleGroup) {
+                    weatherParticleGroup.visible = (t.weather === 'rain' || t.weather === 'storm' || t.weather === 'snow');
+                }
+            }
+
+            if (weatherParticleGroup && weatherParticleGroup.visible) {
+                const fallSpeed = t.weather === 'snow' ? 14 : 42;
+                weatherParticleGroup.children.forEach(drop => {
+                    drop.position.y -= fallSpeed * dt;
+                    if (drop.position.y < 0) {
+                        drop.position.y = 52;
+                        drop.position.x = CameraController.target.x + (Math.random() - 0.5) * 130;
+                        drop.position.z = CameraController.target.z + (Math.random() - 0.5) * 130;
+                    }
+                });
+            }
+        }
+
+        function updateSimulation(dt, elapsed) {
+            updateTimeWeatherAndCosmos(dt, elapsed);
+
+            // If still on Start Screen, slowly orbit camera around the 3D island!
+            if (!GameState.started) {
+                CameraController.yaw += dt * 0.12;
+                return;
+            }
+
+            economyAccumulator += dt * GameState.time.speedMultiplier;
+            if (economyAccumulator >= 1.5) {
+                economyAccumulator = 0;
+
+                let farmers = 0, woodcutters = 0, miners = 0, worshippers = 0, breeders = 0;
+                WorldEntities.villagers.forEach(v => {
+                    if (v.job === 'farmer') farmers++;
+                    else if (v.job === 'woodcutter') woodcutters++;
+                    else if (v.job === 'miner') miners++;
+                    else if (v.job === 'worshipper') worshippers++;
+                    else if (v.job === 'breeder') breeders++;
+                });
+
+                const seasonMult = GameState.time.seasons[GameState.time.seasonIndex].grainMult;
+                GameState.resources.grain += Math.round((farmers * 3 + 3) * seasonMult);
+                GameState.resources.wood += Math.round(woodcutters * 3 + 2);
+                GameState.resources.ore += Math.round(miners * 2 + 1);
+                GameState.resources.mana += Math.round(3 + worshippers * 4);
+
+                addFaithProgress(Math.max(1, Math.round(worshippers * 2 + GameState.era)));
+
+                if (GameState.resources.pop < GameState.resources.maxPop && Math.random() < (0.12 + breeders * 0.15)) {
+                    GameState.resources.pop++;
+                    spawnVillager(new THREE.Vector3(8 + (Math.random() - 0.5) * 6, 0, (Math.random() - 0.5) * 6), 'idle');
+                }
+
+                // Check peaceful conversion of tribes via Impressiveness
+                Object.values(GameState.tribes).forEach(t => {
+                    if (!t.conquered && GameState.resources.impressiveness >= t.impressNeeded) {
+                        conquerTribe(t, 'Friedlich bekehrt 🕊️');
+                    }
+                });
+
+                updateHUD();
+            }
+
+            // Animate Villagers
+            WorldEntities.villagers.forEach(v => {
+                if (v === heldEntity) return;
+                v.timer -= dt;
+                if (v.timer <= 0) {
+                    v.timer = 2.5 + Math.random() * 3;
+                    const a = Math.random() * Math.PI * 2;
+                    const r = 4 + Math.random() * 14;
+                    v.targetPos.set(Math.cos(a) * r, 0, Math.sin(a) * r);
+                }
+                const dx = v.targetPos.x - v.pos.x;
+                const dz = v.targetPos.z - v.pos.z;
+                const dist = Math.hypot(dx, dz);
+                if (dist > 0.4) {
+                    v.pos.x += (dx / dist) * 3.2 * dt;
+                    v.pos.z += (dz / dist) * 3.2 * dt;
+                    v.pos.y = getTerrainHeight(v.pos.x, v.pos.z);
+                }
+            });
+
+            // Animate Autonomous Creature AI
+            const c = GameState.creature;
+            c.stateTimer -= dt;
+            if (c.stateTimer <= 0) {
+                c.stateTimer = 4.5;
+                const a = Math.random() * Math.PI * 2;
+                const d = 8 + Math.random() * 18;
+                c.targetPos.set(Math.cos(a) * d, 0, Math.sin(a) * d);
+                if (c.role === 'gatherer') {
+                    GameState.resources.wood += 12;
+                    c.thought = 'Sammelt Holz für die Siedlung (+12🌲)';
+                    c.lastActionCategory = 'gather';
+                } else if (c.role === 'builder') {
+                    GameState.resources.impressiveness += 6;
+                    c.thought = 'Hilft beim Ausbau der Stadt (+6👑)';
+                    c.lastActionCategory = 'build';
+                } else {
+                    addFaithProgress(4);
+                    c.thought = 'Inspiriert das Volk zu Gebeten (+4🙏)';
+                    c.lastActionCategory = 'entertain';
+                }
+                const thEl = document.getElementById('creature-thought-text');
+                if (thEl) thEl.textContent = c.thought;
+            }
+
+            if (creatureMeshGroup) {
+                const dx = c.targetPos.x - c.pos.x;
+                const dz = c.targetPos.z - c.pos.z;
+                const dist = Math.hypot(dx, dz);
+                if (dist > 0.5) {
+                    c.pos.x += (dx / dist) * 5.0 * dt;
+                    c.pos.z += (dz / dist) * 5.0 * dt;
+                    creatureMeshGroup.rotation.y = Math.atan2(dx, dz);
+                }
+                c.pos.y = getTerrainHeight(c.pos.x, c.pos.z);
+                creatureMeshGroup.position.copy(c.pos);
+            }
+
+            // Update Ballistic Thrown Objects
+            for (let i = WorldEntities.thrownObjects.length - 1; i >= 0; i--) {
+                const th = WorldEntities.thrownObjects[i];
+                th.vel.y -= 28 * dt;
+                th.entity.pos.addScaledVector(th.vel, dt);
+                const groundY = getTerrainHeight(th.entity.pos.x, th.entity.pos.z);
+                if (th.entity.pos.y <= groundY) {
+                    th.entity.pos.y = groundY;
+                    spawn3DParticleBurst(th.entity.pos, 0xf97316, 18);
+                    damageNearbyEnemies(th.entity.pos, 14, 65);
+                    WorldEntities.thrownObjects.splice(i, 1);
+                }
+            }
+
+            // Update 3D Particle Bursts
+            for (let i = WorldEntities.particles.length - 1; i >= 0; i--) {
+                const p = WorldEntities.particles[i];
+                p.vel.y -= 18 * dt;
+                p.mesh.position.addScaledVector(p.vel, dt);
+                p.life -= dt * 1.4;
+                p.mesh.scale.setScalar(Math.max(0.01, p.life));
+                if (p.life <= 0) {
+                    scene.remove(p.mesh);
+                    WorldEntities.particles.splice(i, 1);
+                }
+            }
+        }
+
+        /**********************************************************************
+         * 10. UI RENDERERS, TUTORIAL, SETTINGS & MAIN ANIMATION LOOP
+         **********************************************************************/
+        function changeAlignment(delta, message) {
+            GameState.alignment = THREE.MathUtils.clamp(GameState.alignment + delta, -100, 100);
+            updateWorldAlignmentVisuals();
+            if (message) {
+                triggerAdvisor(delta >= 0 ? 'angel' : 'devil', message);
+            }
+            updateHUD();
+        }
+
+        function triggerAdvisor(which, text) {
+            const el = document.getElementById(which === 'angel' ? 'advisor-angel' : 'advisor-devil');
+            const txt = document.getElementById(which === 'angel' ? 'advisor-angel-text' : 'advisor-devil-text');
+            if (!el || !txt) return;
+            txt.textContent = `„${text}“`;
+            el.style.opacity = '1';
+            el.style.transform = 'translateX(0)';
+            setTimeout(() => {
+                el.style.opacity = '0';
+                el.style.transform = which === 'angel' ? 'translateX(-16px)' : 'translateX(16px)';
+            }, 5200);
+        }
+
+        function conquerTribe(tribe, howText) {
+            if (tribe.conquered) return;
+            tribe.conquered = true;
+            tribe.conqueredHow = howText;
+            GameState.resources.tribute += 120;
+            GameState.InfluenceRadius += 16;
+            addFaithProgress(80);
+            SoundFX.miracleGood();
+            showCosmicBanner('👑', `${tribe.name.toUpperCase()} VEREINT!`, `${howText} (+120 Tribut, +80 Glaube)`);
+            renderTribesStatusUI();
+            updateHUD();
+        }
+
+        function renderTribesStatusUI() {
+            const list = document.getElementById('tribes-status-list');
+            if (!list) return;
+            list.innerHTML = Object.values(GameState.tribes).map(t => `
+                <div class="bg-slate-900/90 p-2 rounded-xl border border-slate-800">
+                    <div class="flex justify-between font-semibold">
+                        <span class="text-slate-200">${t.icon} ${t.name}</span>
+                        <span class="${t.conquered ? 'text-emerald-400' : 'text-amber-300'} text-[10px]">
+                            ${t.conquered ? '✓ Vereint' : `${t.impressNeeded}👑 / ${t.hp}HP`}
+                        </span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderScrollsUI() {
+            const list = document.getElementById('scrolls-list');
+            if (!list) return;
+            list.innerHTML = GameState.quests.map(q => `
+                <div onclick="completeQuestScrollById('${q.id}')" class="god-btn p-2 rounded-xl bg-slate-900/90 border ${q.completed ? 'border-emerald-500/40 opacity-60' : 'border-amber-400/40'} text-[11px]">
+                    <div class="flex justify-between font-bold text-amber-200">
+                        <span>📜 ${q.title}</span>
+                        <span class="text-emerald-300">+${q.rewardTribute}🪙</span>
+                    </div>
+                    <p class="text-[10px] text-slate-400 mt-0.5">${q.desc}</p>
+                </div>
+            `).join('');
+        }
+
+        function completeQuestScrollById(id) {
+            const q = GameState.quests.find(x => x.id === id);
+            if (q && !q.completed) completeQuestScroll(q);
+        }
+
+        function completeQuestScroll(q) {
+            q.completed = true;
+            GameState.resources.tribute += q.rewardTribute;
+            addFaithProgress(35);
+            SoundFX.miracleGood();
+            focusCameraPosition(q.pos);
+            spawn3DParticleBurst(q.pos.clone().add(new THREE.Vector3(0, 3, 0)), 0xfacc15, 28);
+            renderScrollsUI();
+            updateHUD();
+        }
+
+        function renderTributeShopUI() {
+            const grid = document.getElementById('tribute-upgrades-grid');
+            if (!grid) return;
+            grid.innerHTML = GameState.upgrades.map(u => `
+                <div class="bg-slate-900/90 p-3.5 rounded-2xl border border-slate-800 flex flex-col justify-between">
+                    <div>
+                        <div class="font-bold text-amber-300 text-sm">${u.name}</div>
+                        <p class="text-slate-400 text-[11px] mt-1 mb-3">${u.desc}</p>
+                    </div>
+                    <button onclick="buyTributeUpgrade('${u.id}')" ${u.bought ? 'disabled' : ''} class="god-btn w-full py-2 rounded-xl ${u.bought ? 'bg-emerald-950 text-emerald-300' : 'bg-amber-500 text-slate-950 font-bold'}">
+                        ${u.bought ? '✓ Freigeschaltet' : `Freischalten (${u.cost} 🪙)`}
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function buyTributeUpgrade(id) {
+            const u = GameState.upgrades.find(x => x.id === id);
+            if (!u || u.bought || GameState.resources.tribute < u.cost) return;
+            GameState.resources.tribute -= u.cost;
+            u.bought = true;
+            if (id === 'u_hand') GameState.handCarryBonus = 2;
+            if (id === 'u_titan') {
+                GameState.creature.scale = 1.38;
+                if (creatureMeshGroup) creatureMeshGroup.scale.setScalar(1.38);
+            }
+            if (id === 'u_faith') {
+                GameState.resources.impressiveness += 100;
+                addFaithProgress(120);
+            }
+            if (id === 'u_mana') GameState.resources.mana += 300;
+            SoundFX.miracleGood();
+            renderTributeShopUI();
+            updateHUD();
+        }
+
+        function setCreatureRole(role) {
+            GameState.creature.role = role;
+            ['free', 'gatherer', 'builder', 'entertainer', 'soldier'].forEach(r => {
+                const btn = document.getElementById('role-btn-' + r);
+                if (btn) {
+                    btn.className = r === role
+                        ? 'god-btn p-1.5 rounded-lg bg-amber-500/25 border border-amber-400 text-center text-[10px] flex flex-col items-center gap-0.5'
+                        : 'god-btn p-1.5 rounded-lg bg-slate-800/80 border border-slate-700 text-center text-[10px] flex flex-col items-center gap-0.5';
+                }
+            });
+            SoundFX.grab();
+        }
+
+        function reinforceCreature(isPraise) {
+            if (isPraise) {
+                SoundFX.praise();
+                changeAlignment(4, `Du hast ${GameState.creature.name} gelobt!`);
+                spawn3DParticleBurst(GameState.creature.pos.clone().add(new THREE.Vector3(0, 5, 0)), 0x4ade80, 18);
+            } else {
+                SoundFX.slap();
+                changeAlignment(-6, `Du hast ${GameState.creature.name} streng bestraft!`);
+                spawn3DParticleBurst(GameState.creature.pos.clone().add(new THREE.Vector3(0, 5, 0)), 0xf43f5e, 18);
+            }
+            addFaithProgress(8);
+            notifyTutorialAction('creature_reinforced');
+        }
+
+        function feedCreatureDirectly() {
+            if (GameState.resources.grain < 15) return;
+            GameState.resources.grain -= 15;
+            GameState.creature.hunger = Math.min(100, GameState.creature.hunger + 25);
+            GameState.creature.hp = Math.min(100, GameState.creature.hp + 20);
+            SoundFX.praise();
+            updateHUD();
+        }
+
+        function updateCreatureWeight(key, val) {
+            GameState.creature.weights[key] = Number(val);
+            const lbl = document.getElementById('weight-val-' + key);
+            if (lbl) lbl.textContent = val + '%';
+        }
+
+        function recruitPlatoon() {
+            if (GameState.resources.grain < 60 || GameState.resources.ore < 40) {
+                triggerAdvisor('devil', 'Für ein Phalanx-Regiment benötigst du 60 Getreide und 40 Erz!');
+                return;
+            }
+            GameState.resources.grain -= 60;
+            GameState.resources.ore -= 40;
+            spawnPlatoon('greek', new THREE.Vector3(0, 0, 12), true);
+            SoundFX.build();
+            updateHUD();
+        }
+
+        function commandAllPlatoonsAttack() {
+            const targetTribe = Object.values(GameState.tribes).find(t => !t.conquered);
+            if (!targetTribe) return;
+            damageNearbyEnemies(targetTribe.pos, 18, 95);
+            focusCameraPosition(targetTribe.pos);
+            SoundFX.miracleEvil();
+        }
+
+        function updateHUD() {
+            const r = GameState.resources;
+            document.getElementById('res-faith').textContent = Math.floor(GameState.faith);
+            document.getElementById('res-faith-next').textContent = GameState.era < 4 ? `/ ${GameState.nextEraFaith}` : '(MAX)';
+            document.getElementById('res-wood').textContent = Math.floor(r.wood);
+            document.getElementById('res-grain').textContent = Math.floor(r.grain);
+            document.getElementById('res-ore').textContent = Math.floor(r.ore);
+            document.getElementById('res-mana').textContent = Math.floor(r.mana);
+            document.getElementById('res-impress').textContent = Math.floor(r.impressiveness);
+            document.getElementById('res-tribute').textContent = Math.floor(r.tribute);
+            document.getElementById('res-pop').textContent = `${WorldEntities.villagers.length} / ${r.maxPop}`;
+
+            const greekPlatoons = WorldEntities.platoons.filter(p => p.faction === 'greek').length;
+            document.getElementById('platoon-count').textContent = greekPlatoons;
+
+            const t = GameState.time;
+            const curSeason = t.seasons[t.seasonIndex];
+            const hh = String(Math.floor(t.hour)).padStart(2, '0');
+            const mm = String(Math.floor((t.hour % 1) * 60)).padStart(2, '0');
+            document.getElementById('hud-time-icon').textContent = (t.hour < 6 || t.hour >= 20) ? '🌙' : curSeason.icon;
+            document.getElementById('hud-year-text').textContent = `Jahr ${t.year}`;
+            document.getElementById('hud-season-text').textContent = `${curSeason.icon} ${curSeason.name}`;
+            document.getElementById('hud-clock-text').textContent = `${hh}:${mm} Uhr`;
+
+            const align = Math.round(GameState.alignment);
+            const pct = ((align + 100) / 200) * 100;
+            document.getElementById('alignment-marker').style.left = `calc(${pct}% - 4px)`;
+            document.getElementById('alignment-label').textContent = `${align >= 25 ? 'Lichtgott' : (align <= -25 ? 'Kriegsgott' : 'Neutral')} (${align})`;
+
+            const conqueredCount = Object.values(GameState.tribes).filter(tr => tr.conquered).length;
+            document.getElementById('conquered-counter').textContent = `Stämme: ${conqueredCount}/3`;
+        }
+
+        function focusCameraOn(key) {
+            if (key === 'greek') focusCameraPosition(new THREE.Vector3(0, 0, 6));
+            else if (key === 'creature') focusCameraPosition(GameState.creature.pos);
+            else if (GameState.tribes[key]) focusCameraPosition(GameState.tribes[key].pos);
+        }
+
+        function focusCameraPosition(pos) {
+            CameraController.target.set(pos.x, 0, pos.z);
+        }
+
+        function chooseStartCreature(species) {
+            ['lion', 'wolf', 'ape', 'tiger', 'cow'].forEach(s => {
+                const btn = document.getElementById('start-cre-' + s);
+                if (btn) {
+                    btn.className = s === species
+                        ? 'god-btn p-2.5 rounded-2xl bg-amber-500/25 border-2 border-amber-400 text-center flex items-center sm:flex-col justify-center gap-2 sm:gap-1 shadow-lg'
+                        : 'god-btn p-2.5 rounded-2xl bg-slate-900/80 border border-slate-700/80 text-center flex items-center sm:flex-col justify-center gap-2 sm:gap-1';
+                }
+            });
+            buildCreature3DMesh(species);
+            SoundFX.electricZaps();
+        }
+
+        function openStartSubModal(modalId) {
+            SoundFX.electricZaps();
+            toggleModal(modalId);
+        }
+
+        function toggleModal(modalId) {
+            const m = document.getElementById(modalId);
+            if (!m) return;
+            if (m.classList.contains('hidden')) {
+                m.classList.remove('hidden');
+                m.classList.add('flex');
+            } else {
+                m.classList.add('hidden');
+                m.classList.remove('flex');
+            }
+        }
+
+        function applyGameSettings() {
+            const lMode = Number(document.getElementById('inp-setting-lightning').value);
+            LightningFX.intensityMode = lMode;
+            const lLabels = ['Aus', 'Nur im Startbildschirm', 'Hoch (Immer aktiv)'];
+            document.getElementById('lbl-setting-lightning').textContent = lLabels[lMode];
+
+            const gfx = Number(document.getElementById('inp-setting-graphics').value);
+            const gfxLabels = { 1: 'Performant (1x)', 2: 'Hoch (1.5x)', 3: 'Ultra (Hohe Pixel-Dichte)' };
+            document.getElementById('lbl-setting-graphics').textContent = gfxLabels[gfx];
+            if (renderer) renderer.setPixelRatio(gfx === 1 ? 1 : (gfx === 2 ? 1.5 : Math.min(window.devicePixelRatio, 2)));
+
+            const tSpeed = Number(document.getElementById('inp-setting-timespeed').value);
+            GameState.time.speedMultiplier = tSpeed;
+            document.getElementById('lbl-setting-timespeed').textContent = `${tSpeed}x Geschwindigkeit`;
+            document.getElementById('btn-time-speed').textContent = `⏩ ${tSpeed}x`;
+
+            const camSpeed = Number(document.getElementById('inp-setting-camspeed').value);
+            GameState.cameraPanSpeed = camSpeed;
+            document.getElementById('lbl-setting-camspeed').textContent = String(camSpeed);
+        }
+
+        function startGameSession(mode = 'singleplayer') {
+            GameState.started = true;
+            GameState.mode = mode;
+            SoundFX.init();
+            SoundFX.miracleGood();
+
+            document.getElementById('start-screen').classList.add('hidden');
+            ['discord-modal', 'settings-modal'].forEach(id => {
+                const m = document.getElementById(id);
+                if (m) { m.classList.add('hidden'); m.classList.remove('flex'); }
+            });
+
+            if (mode === 'training') {
+                GameState.tutorial.active = true;
+                GameState.tutorial.step = 0;
+                document.getElementById('tutorial-overlay').classList.remove('hidden');
+                renderTutorialStepUI();
+                triggerAdvisor('angel', 'Willkommen im Götter-Training! Folge den 6 interaktiven Schritten oben.');
+            } else if (mode === 'multiplayer') {
+                GameState.tutorial.active = false;
+                document.getElementById('tutorial-overlay').classList.add('hidden');
+                showCosmicBanner('💬', `DISCORD-PANTHEON AKTIV (${GameState.discord.roomCode})`, 'Du spielst nun im vernetzten Pantheon-Modus mit deiner Discord-Lobby!');
+            } else {
+                GameState.tutorial.active = false;
+                document.getElementById('tutorial-overlay').classList.add('hidden');
+                showCosmicBanner('🔥', 'EPOCHE I: URSPRUNG DER ZIVILISATION', 'Manifestiere den Glauben deiner Nomaden am heiligen Fluss!');
+            }
+            updateHUD();
+        }
+
+        function returnToStartScreen() {
+            GameState.started = false;
+            document.getElementById('start-screen').classList.remove('hidden');
+            SoundFX.electricZaps();
+        }
+
+        function renderTutorialStepUI() {
+            const tut = GameState.tutorial;
+            if (!tut.active) return;
+            const s = tut.steps[tut.step];
+            document.getElementById('tut-step-counter').textContent = `Schritt ${tut.step + 1} / ${tut.steps.length}`;
+            document.getElementById('tut-step-title').textContent = s.title;
+            document.getElementById('tut-step-desc').innerHTML = s.desc;
+            document.getElementById('tut-step-task').innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i><span>${s.task}</span>`;
+        }
+
+        function notifyTutorialAction(actionKey) {
+            const tut = GameState.tutorial;
+            if (!tut.active) return;
+            if (tut.step === 0 && actionKey === 'camera_moved') advanceTutorialStep();
+            else if (tut.step === 1 && actionKey === 'villager_assigned') advanceTutorialStep();
+            else if (tut.step === 2 && actionKey === 'resource_stored') advanceTutorialStep();
+            else if (tut.step === 3 && actionKey === 'building_placed') advanceTutorialStep();
+            else if (tut.step === 4 && actionKey === 'miracle_cast') advanceTutorialStep();
+            else if (tut.step === 5 && actionKey === 'creature_reinforced') advanceTutorialStep();
+        }
+
+        function advanceTutorialStep() {
+            const tut = GameState.tutorial;
+            if (!tut.active) return;
+            SoundFX.praise();
+            tut.step++;
+            if (tut.step >= tut.steps.length) endTutorialSession(true);
+            else renderTutorialStepUI();
+        }
+
+        function endTutorialSession(completedAll = false) {
+            GameState.tutorial.active = false;
+            document.getElementById('tutorial-overlay').classList.add('hidden');
+            if (completedAll) {
+                GameState.resources.tribute += 120;
+                addFaithProgress(45);
+                showCosmicBanner('🎓', 'GÖTTER-TRAINING ABGESCHLOSSEN!', 'Du erhältst +120 Tribut & +45 Glaube für deine Zivilisation!');
+                updateHUD();
+            }
+        }
+
+        function updateCameraAndCursor(dt) {
+            const c = CameraController;
+            const panSpeed = GameState.cameraPanSpeed * dt;
+            const forward = new THREE.Vector3(-Math.sin(c.yaw), 0, -Math.cos(c.yaw));
+            const right = new THREE.Vector3(Math.cos(c.yaw), 0, -Math.sin(c.yaw));
+
+            if (c.keys['w'] || c.keys['arrowup'] || c.keys['s'] || c.keys['arrowdown'] || c.keys['a'] || c.keys['d'] || c.keys['q'] || c.keys['e']) {
+                notifyTutorialAction('camera_moved');
+            }
+            if (c.keys['w'] || c.keys['arrowup']) c.target.addScaledVector(forward, panSpeed);
+            if (c.keys['s'] || c.keys['arrowdown']) c.target.addScaledVector(forward, -panSpeed);
+            if (c.keys['d'] || c.keys['arrowright']) c.target.addScaledVector(right, panSpeed);
+            if (c.keys['a'] || c.keys['arrowleft']) c.target.addScaledVector(right, -panSpeed);
+            if (c.keys['q']) c.yaw += 1.4 * dt;
+            if (c.keys['e']) c.yaw -= 1.4 * dt;
+
+            c.target.x = THREE.MathUtils.clamp(c.target.x, -125, 125);
+            c.target.z = THREE.MathUtils.clamp(c.target.z, -125, 125);
+
+            const camX = c.target.x + Math.sin(c.yaw) * Math.cos(c.pitch) * c.distance;
+            const camY = Math.sin(c.pitch) * c.distance;
+            const camZ = c.target.z + Math.cos(c.yaw) * Math.cos(c.pitch) * c.distance;
+            camera.position.set(camX, camY, camZ);
+            camera.lookAt(c.target.x, getTerrainHeight(c.target.x, c.target.z), c.target.z);
+
+            const hit = getRayTerrainIntersection();
+            if (hit && godHandGroup) {
+                handVelocity.subVectors(hit, lastHandWorldPos).divideScalar(Math.max(0.008, dt));
+                lastHandWorldPos.copy(hit);
+                godHandGroup.position.set(hit.x, hit.y + 3.2, hit.z);
+
+                if (heldEntity) {
+                    heldEntity.pos.set(hit.x, hit.y + 2.4, hit.z);
+                }
+                if (buildPreviewMesh && buildPreviewMesh.visible) {
+                    buildPreviewMesh.position.set(hit.x, hit.y + 2.0, hit.z);
+                }
+            }
+        }
+
+        function animateLoop() {
+            requestAnimationFrame(animateLoop);
+            const dt = Math.min(clock.getDelta(), 0.1);
+            const elapsed = clock.getElapsedTime();
+
+            LightningFX.updateAndDraw(dt);
+            updateCameraAndCursor(dt);
+            updateSimulation(dt, elapsed);
+            renderer.render(scene, camera);
+        }
+
+        window.onload = function () {
+            LightningFX.init();
+            initThreeWorld();
+            initInputHandlers();
+            updateHUD();
+            animateLoop();
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,1695 @@
+<!DOCTYPE html>
+<html lang="de" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GOD:less — Divine RTS & God Simulation</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js WebGL Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Google Fonts: Cinzel Decorative, Cinzel & Plus Jakarta Sans -->
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Cinzel:wght@600;700;900&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --font-display: 'Cinzel Decorative', 'Cinzel', serif;
+            --font-serif: 'Cinzel', serif;
+            --font-sans: 'Plus Jakarta Sans', sans-serif;
+        }
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #050811;
+            color: #f8fafc;
+            font-family: var(--font-sans);
+        }
+        .font-cinzel {
+            font-family: var(--font-serif);
+        }
+        .font-monumental {
+            font-family: var(--font-display);
+        }
+
+        /* 3D WebGL & Overlay Canvases */
+        #webgl-container {
+            position: fixed;
+            inset: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+        }
+        #gesture-canvas {
+            position: fixed;
+            inset: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 12;
+            pointer-events: none;
+        }
+        #lightning-fx-canvas {
+            position: fixed;
+            inset: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 48;
+            pointer-events: none;
+        }
+
+        /* Age of Empires IV Inspired Royal Glass & Gold Trim Panels */
+        .god-panel {
+            background: linear-gradient(165deg, rgba(12, 19, 34, 0.90) 0%, rgba(7, 11, 22, 0.94) 100%);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(217, 169, 78, 0.38);
+            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.78), inset 0 1px 0 rgba(255, 235, 180, 0.16);
+        }
+        .god-panel-gold {
+            background: linear-gradient(145deg, rgba(16, 24, 42, 0.95), rgba(8, 12, 24, 0.98));
+            backdrop-filter: blur(22px);
+            border: 1px solid rgba(234, 179, 8, 0.55);
+            box-shadow: 0 18px 55px rgba(0, 0, 0, 0.9), 0 0 35px rgba(234, 179, 8, 0.18);
+        }
+
+        /* Monumental Title Glow */
+        .godless-title {
+            letter-spacing: 0.14em;
+            text-shadow:
+                0 0 28px rgba(251, 191, 36, 0.60),
+                0 0 65px rgba(244, 63, 94, 0.40),
+                0 8px 22px rgba(0, 0, 0, 0.95);
+        }
+
+        /* "Gottloser Scroller-Effekt" (3D Perspective Parallax Carousel) */
+        .ungodly-scroller-viewport {
+            perspective: 1400px;
+            overflow-x: auto;
+            overflow-y: visible;
+            scroll-behavior: smooth;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            padding: 16px 12px;
+        }
+        .ungodly-scroller-viewport::-webkit-scrollbar {
+            display: none;
+        }
+        .ungodly-card {
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+                        box-shadow 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+                        border-color 0.35s ease;
+            background: linear-gradient(160deg, rgba(15, 23, 42, 0.93) 0%, rgba(6, 10, 21, 0.98) 100%);
+            border: 1px solid rgba(217, 169, 78, 0.32);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.85);
+            overflow: hidden;
+        }
+        .ungodly-card::before {
+            content: '';
+            position: absolute;
+            inset: -2px;
+            background: conic-gradient(from 180deg at 50% 50%, rgba(251, 191, 36, 0) 0deg, rgba(251, 191, 36, 0.65) 90deg, rgba(244, 63, 94, 0.65) 180deg, rgba(56, 189, 248, 0.65) 270deg, rgba(251, 191, 36, 0) 360deg);
+            opacity: 0;
+            transition: opacity 0.35s ease;
+            z-index: 0;
+            pointer-events: none;
+        }
+        .ungodly-card:hover {
+            transform: translateY(-8px) scale(1.03) rotateX(4deg);
+            border-color: rgba(251, 191, 36, 0.9);
+            box-shadow:
+                0 28px 65px rgba(0, 0, 0, 0.95),
+                0 0 35px rgba(251, 191, 36, 0.35),
+                0 0 60px rgba(244, 63, 94, 0.22);
+        }
+        .ungodly-card:hover::before {
+            opacity: 0.24;
+        }
+        .ungodly-card-inner {
+            position: relative;
+            z-index: 2;
+        }
+
+        /* Interactive Buttons */
+        .god-btn {
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            cursor: pointer;
+        }
+        .god-btn:hover {
+            transform: translateY(-2px);
+            filter: brightness(1.12);
+        }
+        .god-btn:active {
+            transform: translateY(1px) scale(0.98);
+        }
+
+        /* Custom Scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(234, 179, 8, 0.45);
+            border-radius: 9999px;
+        }
+
+        @keyframes cosmicBannerAnim {
+            0% { transform: translate(-50%, -25px); opacity: 0; }
+            100% { transform: translate(-50%, 0); opacity: 1; }
+        }
+        .cosmic-banner-enter {
+            animation: cosmicBannerAnim 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+    </style>
+</head>
+
+<body oncontextmenu="return false;">
+
+    <!-- 1. 3D WebGL Island World Viewport -->
+    <div id="webgl-container"></div>
+
+    <!-- 2. 2D Miracle Gesture Drawing Canvas -->
+    <canvas id="gesture-canvas"></canvas>
+
+    <!-- 3. Interactive Mouse-Triggered Lightning & Divine Aura Canvas -->
+    <canvas id="lightning-fx-canvas"></canvas>
+
+    <!-- ===================================================================== -->
+    <!-- MONUMENTAL START SCREEN: GOD:less (WITH CREATURE FORGE & SCROLLER)    -->
+    <!-- ===================================================================== -->
+    <div id="start-screen" class="fixed inset-0 z-40 flex flex-col justify-between bg-gradient-to-b from-slate-950/85 via-slate-950/55 to-slate-950/90 backdrop-blur-sm overflow-y-auto p-4 sm:p-6">
+        
+        <!-- Top Status Bar on Start Screen -->
+        <div class="w-full max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2 z-10">
+            <div class="flex items-center gap-2.5 bg-slate-900/85 border border-amber-400/40 rounded-full px-3.5 py-1.5 text-xs shadow-lg">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span class="font-cinzel font-bold text-amber-300 tracking-wider">GOD:less ENGINE • AoE-IV HD-GRAFIK &amp; EIGENE KREATUREN</span>
+            </div>
+            <div class="flex items-center flex-wrap gap-2">
+                <button id="start-load-save-btn" onclick="loadSavedGame(true)" class="god-btn hidden bg-emerald-950/90 hover:bg-emerald-800 border border-emerald-400/50 text-emerald-200 rounded-full px-3.5 py-1.5 text-xs font-bold items-center gap-1.5 shadow-lg">
+                    <i class="fa-solid fa-floppy-disk text-emerald-400"></i>
+                    <span id="start-load-save-text">Spielstand fortsetzen</span>
+                </button>
+                <span id="start-discord-pill" class="bg-indigo-950/85 border border-indigo-400/40 text-indigo-200 rounded-full px-3.5 py-1.5 text-xs font-medium flex items-center gap-1.5">
+                    <i class="fa-brands fa-discord text-indigo-400"></i>
+                    <span id="start-discord-status-text">Discord: Bereit</span>
+                </span>
+                <button onclick="openStartSubModal('creature-forge-modal')" class="god-btn bg-amber-500/20 hover:bg-amber-500/35 border border-amber-400/60 text-amber-200 rounded-full px-3.5 py-1.5 text-xs font-bold flex items-center gap-1.5">
+                    <i class="fa-solid fa-dna text-amber-400"></i>
+                    <span>Kreaturen-Designer</span>
+                </button>
+                <button onclick="openStartSubModal('settings-modal')" class="god-btn bg-slate-900/85 hover:bg-slate-800 border border-slate-700 text-slate-200 rounded-full px-3.5 py-1.5 text-xs font-semibold flex items-center gap-1.5">
+                    <i class="fa-solid fa-sliders text-amber-400"></i>
+                    <span>Settings</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Center Hero Section: GOD:less Title, Custom Creature Preview Bar & Mode Scroller -->
+        <div class="w-full max-w-7xl mx-auto my-auto py-3 z-10 flex flex-col items-center">
+            
+            <!-- Unmistakable GOD:less Title & Lore -->
+            <div class="text-center max-w-4xl mx-auto mb-4">
+                <div class="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-gradient-to-r from-rose-950/90 via-slate-900/90 to-sky-950/90 border border-amber-400/40 text-[11px] font-bold tracking-[0.25em] uppercase text-amber-300 mb-2.5 shadow-lg">
+                    <i class="fa-solid fa-bolt text-rose-400"></i>
+                    <span>Göttliche Echtzeit-Strategie • Erschaffe deine Welt &amp; deinen Avatar</span>
+                    <i class="fa-solid fa-crown text-amber-300"></i>
+                </div>
+
+                <h1 class="font-monumental godless-title text-4xl sm:text-6xl md:text-7xl font-black uppercase leading-none">
+                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-amber-400 to-yellow-500">GOD</span><span class="text-rose-500 mx-0.5">:</span><span class="text-transparent bg-clip-text bg-gradient-to-r from-slate-100 via-sky-200 to-indigo-400">LESS</span>
+                </h1>
+
+                <p class="text-xs sm:text-sm md:text-base text-slate-300 mt-2.5 leading-relaxed max-w-2xl mx-auto font-normal">
+                    Eine gottlose Welt erwartet deine Hand. Forme im <b class="text-amber-300">Kreaturen-Designer</b> deinen eigenen mythischen Avatar, führe eine detailreiche Zivilisation vom Nomadenlager zum Imperium und entfessle Blitze mit jeder Bewegung deiner Maus!
+                </p>
+            </div>
+
+            <!-- Custom Creature Forge Summary Bar (Opens Full 3D Creature Designer) -->
+            <div class="w-full max-w-4xl mb-4 god-panel rounded-2xl p-3 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div class="flex items-center gap-3">
+                    <div id="start-creature-color-preview" class="w-11 h-11 rounded-2xl border-2 border-amber-400 flex items-center justify-center text-xl shadow-lg" style="background: linear-gradient(135deg, #d97706, #7c2d12);">
+                        <i class="fa-solid fa-dragon text-amber-200"></i>
+                    </div>
+                    <div>
+                        <div class="text-[10px] font-cinzel font-bold uppercase tracking-widest text-amber-300">
+                            Eigene Schöpfung • Göttlicher Avatar
+                        </div>
+                        <div id="start-creature-summary" class="text-xs sm:text-sm font-bold text-white">
+                            Aetherion • Bipedaler Titan • Drachen-Hörner • Engels-Schwingen
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 w-full sm:w-auto">
+                    <button onclick="randomizeCustomCreature()" class="god-btn flex-1 sm:flex-initial px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-amber-300 text-xs font-semibold">
+                        🎲 Zufalls-Mutation
+                    </button>
+                    <button onclick="openStartSubModal('creature-forge-modal')" class="god-btn flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-gradient-to-r from-amber-400 via-amber-500 to-orange-500 text-slate-950 font-cinzel font-black text-xs uppercase tracking-wider shadow-lg">
+                        <i class="fa-solid fa-dna mr-1"></i>Kreatur Erschaffen / Anpassen
+                    </button>
+                </div>
+            </div>
+
+            <!-- "Gottloser Scroller-Effekt" (5 Interactive 3D Mode Portals) -->
+            <div class="w-full relative">
+                <div class="flex items-center justify-between px-2 mb-1">
+                    <span class="font-cinzel font-bold text-xs uppercase tracking-widest text-amber-300">
+                        <i class="fa-solid fa-wand-sparkles mr-1.5"></i>Wähle dein Schicksal in GOD:less (3D-Parallax-Scroller)
+                    </span>
+                    <div class="flex items-center gap-1.5">
+                        <button onclick="scrollModeCards(-1)" class="god-btn w-7 h-7 rounded-lg bg-slate-900/90 border border-slate-700 text-amber-300 flex items-center justify-center text-xs">
+                            <i class="fa-solid fa-chevron-left"></i>
+                        </button>
+                        <button onclick="scrollModeCards(1)" class="god-btn w-7 h-7 rounded-lg bg-slate-900/90 border border-slate-700 text-amber-300 flex items-center justify-center text-xs">
+                            <i class="fa-solid fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="ungodly-scroller" class="ungodly-scroller-viewport flex items-stretch gap-4 w-full">
+                    
+                    <!-- CARD 1: SINGLEPLAYER (URSPRUNG DER ZIVILISATION) -->
+                    <div onmousemove="tiltCard3D(event, this)" onmouseleave="resetCard3D(this)" onclick="startGameSession('singleplayer')" class="ungodly-card min-w-[275px] sm:min-w-[305px] flex-1 rounded-3xl p-5 cursor-pointer group">
+                        <div class="ungodly-card-inner flex flex-col justify-between h-full">
+                            <div>
+                                <div class="flex items-center justify-between mb-2.5">
+                                    <span class="px-2.5 py-1 rounded-full bg-amber-500/20 border border-amber-400/50 text-amber-300 text-[10px] font-bold uppercase tracking-wider">
+                                        🔥 Neues Spiel
+                                    </span>
+                                    <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center text-slate-950 text-lg shadow-lg">
+                                        <i class="fa-solid fa-crown"></i>
+                                    </div>
+                                </div>
+                                <h2 class="font-cinzel font-black text-lg text-amber-300 group-hover:text-amber-200">
+                                    SINGLEPLAYER
+                                </h2>
+                                <div class="text-[11px] font-bold text-cyan-300 uppercase tracking-wider mb-2">
+                                    Ursprung der Zivilisation
+                                </div>
+                                <p class="text-xs text-slate-300 leading-relaxed mb-4">
+                                    Starte im <b>Anfangszustand (Epoche I)</b> am Flusstal. Beobachte echte Menschen mit Werkzeugen bei der Arbeit, manifestiere ihren Glauben durch 4 Epochen in realistischer Echtzeit!
+                                </p>
+                            </div>
+                            <button class="god-btn w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-400 via-amber-500 to-orange-500 text-slate-950 font-cinzel font-black text-xs uppercase tracking-wider shadow-lg">
+                                Neue Welt Starten →
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- CARD 2: KREATUREN-SCHMIEDE (CUSTOM CREATURE DESIGNER) -->
+                    <div onmousemove="tiltCard3D(event, this)" onmouseleave="resetCard3D(this)" onclick="openStartSubModal('creature-forge-modal')" class="ungodly-card min-w-[275px] sm:min-w-[305px] flex-1 rounded-3xl p-5 cursor-pointer group">
+                        <div class="ungodly-card-inner flex flex-col justify-between h-full">
+                            <div>
+                                <div class="flex items-center justify-between mb-2.5">
+                                    <span class="px-2.5 py-1 rounded-full bg-rose-500/20 border border-rose-400/50 text-rose-300 text-[10px] font-bold uppercase tracking-wider">
+                                        🧬 Editor
+                                    </span>
+                                    <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-rose-500 to-amber-500 flex items-center justify-center text-white text-lg shadow-lg">
+                                        <i class="fa-solid fa-dna"></i>
+                                    </div>
+                                </div>
+                                <h2 class="font-cinzel font-black text-lg text-rose-300 group-hover:text-rose-200">
+                                    KREATUR-DESIGNER
+                                </h2>
+                                <div class="text-[11px] font-bold text-amber-300 uppercase tracking-wider mb-2">
+                                    Eigene Schöpfung formen
+                                </div>
+                                <p class="text-xs text-slate-300 leading-relaxed mb-4">
+                                    Kein Standard-Tier! Kombiniere <b>Körperbau, Hörner, Schwingen, Rücken-Kristalle, Schweif-Waffen, Größe &amp; Leucht-Aura</b> zu deinem persönlichen göttlichen Wächter.
+                                </p>
+                            </div>
+                            <button class="god-btn w-full py-2.5 rounded-xl bg-gradient-to-r from-rose-500 to-amber-500 text-white font-cinzel font-black text-xs uppercase tracking-wider shadow-lg">
+                                Kreaturen-Schmiede Öffnen →
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- CARD 3: MULTIPLAYER & DISCORD SERVER BRIDGE -->
+                    <div onmousemove="tiltCard3D(event, this)" onmouseleave="resetCard3D(this)" onclick="openStartSubModal('discord-modal')" class="ungodly-card min-w-[275px] sm:min-w-[305px] flex-1 rounded-3xl p-5 cursor-pointer group">
+                        <div class="ungodly-card-inner flex flex-col justify-between h-full">
+                            <div>
+                                <div class="flex items-center justify-between mb-2.5">
+                                    <span class="px-2.5 py-1 rounded-full bg-indigo-500/25 border border-indigo-400/50 text-indigo-300 text-[10px] font-bold uppercase tracking-wider">
+                                        <i class="fa-brands fa-discord mr-1"></i>Discord-Bridge
+                                    </span>
+                                    <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-lg shadow-lg">
+                                        <i class="fa-brands fa-discord"></i>
+                                    </div>
+                                </div>
+                                <h2 class="font-cinzel font-black text-lg text-indigo-300 group-hover:text-indigo-200">
+                                    MULTIPLAYER
+                                </h2>
+                                <div class="text-[11px] font-bold text-purple-300 uppercase tracking-wider mb-2">
+                                    Discord-Pantheon &amp; Co-Op
+                                </div>
+                                <p class="text-xs text-slate-300 leading-relaxed mb-4">
+                                    Verbinde deinen <b>Discord-Server</b> per Invite oder Webhook! Teile deinen Raum-Code mit Freunden und herrscht gemeinsam über die Insel.
+                                </p>
+                            </div>
+                            <button class="god-btn w-full py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white font-cinzel font-black text-xs uppercase tracking-wider shadow-lg">
+                                Discord-Lobby Öffnen →
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- CARD 4: TRAINING / TUTORIAL SESSION -->
+                    <div onmousemove="tiltCard3D(event, this)" onmouseleave="resetCard3D(this)" onclick="startGameSession('training')" class="ungodly-card min-w-[275px] sm:min-w-[305px] flex-1 rounded-3xl p-5 cursor-pointer group">
+                        <div class="ungodly-card-inner flex flex-col justify-between h-full">
+                            <div>
+                                <div class="flex items-center justify-between mb-2.5">
+                                    <span class="px-2.5 py-1 rounded-full bg-cyan-500/20 border border-cyan-400/50 text-cyan-300 text-[10px] font-bold uppercase tracking-wider">
+                                        🎓 Tutorial
+                                    </span>
+                                    <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-cyan-400 to-sky-600 flex items-center justify-center text-slate-950 text-lg shadow-lg">
+                                        <i class="fa-solid fa-graduation-cap"></i>
+                                    </div>
+                                </div>
+                                <h2 class="font-cinzel font-black text-lg text-cyan-300 group-hover:text-cyan-200">
+                                    TRAINING &amp; LEHRE
+                                </h2>
+                                <div class="text-[11px] font-bold text-emerald-300 uppercase tracking-wider mb-2">
+                                    6-Schritte Einführung
+                                </div>
+                                <p class="text-xs text-slate-300 leading-relaxed mb-4">
+                                    Erlerne interaktiv die Praktiken in <b>GOD:less</b>: Hand Gottes, Dorfbewohner-Berufe, Gebäude-Architektur, Gesten-Runen und Kreaturen-Erziehung.
+                                </p>
+                            </div>
+                            <button class="god-btn w-full py-2.5 rounded-xl bg-gradient-to-r from-cyan-400 to-emerald-500 text-slate-950 font-cinzel font-black text-xs uppercase tracking-wider shadow-lg">
+                                Training Starten →
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- CARD 5: SETTINGS & SAVEGAME MANAGER -->
+                    <div onmousemove="tiltCard3D(event, this)" onmouseleave="resetCard3D(this)" onclick="openStartSubModal('settings-modal')" class="ungodly-card min-w-[275px] sm:min-w-[305px] flex-1 rounded-3xl p-5 cursor-pointer group">
+                        <div class="ungodly-card-inner flex flex-col justify-between h-full">
+                            <div>
+                                <div class="flex items-center justify-between mb-2.5">
+                                    <span class="px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/50 text-emerald-300 text-[10px] font-bold uppercase tracking-wider">
+                                        ⚙️ System &amp; Speicher
+                                    </span>
+                                    <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center text-slate-950 text-lg shadow-lg">
+                                        <i class="fa-solid fa-sliders"></i>
+                                    </div>
+                                </div>
+                                <h2 class="font-cinzel font-black text-lg text-emerald-300 group-hover:text-emerald-200">
+                                    SETTINGS &amp; SAVE
+                                </h2>
+                                <div class="text-[11px] font-bold text-amber-300 uppercase tracking-wider mb-2">
+                                    Grafik, Zeitsystem &amp; Spielstände
+                                </div>
+                                <p class="text-xs text-slate-300 leading-relaxed mb-4">
+                                    Speichere oder lade deinen Spielstand, konfiguriere die <b>HD-Terrain-Auflösung</b>, den <b>Blitz-Cursor</b> und die Geschwindigkeit des Tag-/Nachtzyklus.
+                                </p>
+                            </div>
+                            <button class="god-btn w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-emerald-400/50 text-emerald-300 font-cinzel font-bold text-xs uppercase tracking-wider shadow-lg">
+                                Settings &amp; Spielstand →
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Hint Footer on Start Screen -->
+        <div class="w-full max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400 z-10 border-t border-slate-800/80 pt-2">
+            <div>
+                <i class="fa-solid fa-bolt text-amber-400 mr-1"></i>
+                <b>Interaktiver Blitz-Cursor:</b> Bewege deine Maus oder klicke, um göttliche Lichtbögen auszulösen.
+            </div>
+            <div class="font-cinzel text-amber-300/80">
+                GOD:less • Age of Empires Inspired Procedural 3D Engine
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- IN-GAME TOP HUD BAR: FAITH, RESOURCES, ALIGNMENT, TIME & SAVE/MENU    -->
+    <!-- ===================================================================== -->
+    <header class="fixed top-2 left-2 right-2 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+        
+        <!-- Left: GOD:less Brand, Era & Resource Counters -->
+        <div class="god-panel rounded-2xl px-3 py-2 flex flex-wrap items-center gap-2.5 pointer-events-auto">
+            <button onclick="openStartSubModal('settings-modal')" class="god-btn flex items-center gap-2 pr-2.5 border-r border-amber-500/30 text-left" title="Menü, Speichern & Einstellungen öffnen">
+                <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-300 via-amber-500 to-rose-600 flex items-center justify-center shadow-lg">
+                    <i class="fa-solid fa-crown text-slate-950 text-sm"></i>
+                </div>
+                <div>
+                    <div class="font-cinzel font-black text-xs sm:text-sm tracking-wider text-amber-300 leading-none">GOD:LESS</div>
+                    <span id="hud-era-subtitle" class="text-[10px] font-semibold tracking-widest text-cyan-300 uppercase">EPOCHE I • NOMADEN</span>
+                </div>
+            </button>
+
+            <!-- Resource Badges -->
+            <div class="flex flex-wrap items-center gap-1.5 text-xs">
+                <div class="flex items-center gap-1.5 bg-slate-900/90 px-2 py-1 rounded-lg border border-cyan-500/40" title="Manifestierter Glaube (Schaltet die 4 Zivilisations-Epochen frei)">
+                    <i class="fa-solid fa-hands-praying text-cyan-300"></i>
+                    <span class="text-slate-400 hidden xl:inline">Glaube:</span>
+                    <span id="res-faith" class="font-bold text-cyan-200">15</span>
+                    <span id="res-faith-next" class="text-[10px] text-slate-400">/ 100</span>
+                </div>
+                <div class="flex items-center gap-1.5 bg-slate-900/90 px-2 py-1 rounded-lg border border-emerald-500/30" title="Holz im Lagerhaus">
+                    <i class="fa-solid fa-tree text-emerald-400"></i>
+                    <span id="res-wood" class="font-bold text-emerald-300">110</span>
+                </div>
+                <div class="flex items-center gap-1.5 bg-slate-900/90 px-2 py-1 rounded-lg border border-amber-500/30" title="Getreide / Nahrung">
+                    <i class="fa-solid fa-wheat-awn text-amber-400"></i>
+                    <span id="res-grain" class="font-bold text-amber-300">110</span>
+                </div>
+                <div class="flex items-center gap-1.5 bg-slate-900/90 px-2 py-1 rounded-lg border border-sky-500/30" title="Erz & Stein im Lagerhaus">
+                    <i class="fa-solid fa-gem text-sky-400"></i>
+                    <span id="res-ore" class="font-bold text-sky-300">65</span>
+                </div>
+                <div class="flex items-center gap-1.5 bg-slate-900/90 px-2 py-1 rounded-lg border border-purple-500/40" title="Göttliches Mana für Wunder">
+                    <i class="fa-solid fa-wand-magic-sparkles text-purple-400"></i>
+                    <span id="res-mana" class="font-bold text-purple-300">90</span>
+                </div>
+                <div class="flex items-center gap-1.5 bg-slate-900/90 px-2 py-1 rounded-lg border border-yellow-500/40" title="Eindruckswert deiner Stadt">
+                    <i class="fa-solid fa-landmark text-yellow-400"></i>
+                    <span id="res-impress" class="font-bold text-yellow-300">40</span>
+                </div>
+                <div class="flex items-center gap-1.5 bg-slate-900/90 px-2 py-1 rounded-lg border border-cyan-500/30" title="Bevölkerung / Wohnraum">
+                    <i class="fa-solid fa-users text-cyan-400"></i>
+                    <span id="res-pop" class="font-bold text-cyan-300">6 / 12</span>
+                </div>
+                <button onclick="toggleModal('tribute-modal')" class="god-btn flex items-center gap-1 bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 font-bold px-2.5 py-1 rounded-lg shadow" title="Tribut-Kammer öffnen">
+                    <i class="fa-solid fa-coins"></i>
+                    <span id="res-tribute">100</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Center: Alignment Bar + Realistic Slow World Clock & Seasons -->
+        <div class="god-panel rounded-2xl px-3.5 py-1.5 flex flex-wrap items-center gap-3 pointer-events-auto">
+            <div class="flex items-center gap-2 min-w-[165px] sm:min-w-[195px]">
+                <i class="fa-solid fa-skull-crossbones text-rose-400 text-xs" title="Skrupellos / Böse (-100)"></i>
+                <div class="flex-1 flex flex-col gap-0.5">
+                    <div class="flex justify-between text-[10px] font-semibold">
+                        <span id="alignment-label" class="text-amber-300">Neutral (0)</span>
+                        <span id="conquered-counter" class="text-emerald-300">Reiche: 0/3</span>
+                    </div>
+                    <div class="relative w-full h-2 rounded-full bg-gradient-to-r from-rose-700 via-slate-600 to-sky-400 p-0.5 overflow-hidden">
+                        <div id="alignment-marker" class="absolute top-0 bottom-0 w-2 bg-white rounded-full shadow-[0_0_8px_#fff] transition-all duration-300" style="left: calc(50% - 4px);"></div>
+                    </div>
+                </div>
+                <i class="fa-solid fa-dove text-sky-300 text-xs" title="Gütig / Erhaben (+100)"></i>
+            </div>
+
+            <div class="h-7 w-[1px] bg-slate-700/80 hidden sm:block"></div>
+
+            <!-- World Clock (Now slow & realistic at 1x!) -->
+            <div class="flex items-center gap-1.5 text-xs">
+                <div class="bg-slate-900/90 px-2.5 py-1 rounded-xl border border-slate-700/80 flex items-center gap-2">
+                    <span id="hud-time-icon" class="text-sm">☀️</span>
+                    <div class="leading-tight">
+                        <div class="font-bold text-[11px] text-amber-200">
+                            <span id="hud-year-text">Jahr 1</span> • <span id="hud-season-text">🌸 Frühling</span>
+                        </div>
+                        <div class="text-[10px] text-slate-400 flex items-center gap-1">
+                            <span id="hud-clock-text">09:30 Uhr</span> • <span id="hud-weather-text" class="text-sky-300">Klar</span>
+                        </div>
+                    </div>
+                </div>
+                <button onclick="cycleTimeSpeed()" id="btn-time-speed" class="god-btn px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-amber-500/40 text-[11px] font-bold text-amber-300" title="Zeitgeschwindigkeit umschalten (1x = Ruhige Echtzeit, 2x, 5x, 10x)">
+                    ⏳ 1x
+                </button>
+                <button onclick="triggerRandomCosmicOrDisaster()" class="god-btn px-2 py-1.5 rounded-xl bg-purple-950/85 hover:bg-purple-800/85 border border-purple-500/40 text-[11px] font-bold text-purple-200" title="Kosmisches Ereignis oder Katastrophe herbeirufen">
+                    ☄️ Kosmos
+                </button>
+            </div>
+        </div>
+
+        <!-- Right: Camera Jump, Quick-Save, Settings & Return to Start Screen -->
+        <div class="god-panel rounded-2xl px-2.5 py-1.5 flex items-center gap-1.5 pointer-events-auto text-xs">
+            <button onclick="focusCameraOn('greek')" class="god-btn px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300" title="Kamera zur Hauptstadt">
+                <i class="fa-solid fa-landmark"></i>
+            </button>
+            <button onclick="focusCameraOn('creature')" class="god-btn px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-purple-300" title="Kamera zu deiner Kreatur">
+                <i class="fa-solid fa-dragon"></i>
+            </button>
+            <button onclick="focusCameraOn('vikings')" class="god-btn px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300" title="Nord-Feste: Wikinger">
+                <i class="fa-solid fa-shield-halved"></i>
+            </button>
+            <button onclick="focusCameraOn('japanese')" class="god-btn px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-300" title="Ost-Plateau: Japaner">
+                <i class="fa-solid fa-torii-gate"></i>
+            </button>
+            <button onclick="focusCameraOn('aztecs')" class="god-btn px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-rose-400" title="Süd-Vulkan: Azteken">
+                <i class="fa-solid fa-volcano"></i>
+            </button>
+            <div class="h-4 w-[1px] bg-slate-700 mx-0.5"></div>
+            <button onclick="saveCurrentGame(true)" class="god-btn px-2.5 py-1.5 rounded-lg bg-emerald-950/90 hover:bg-emerald-800 border border-emerald-400/50 text-emerald-300 font-semibold flex items-center gap-1" title="Aktuelles Spiel sofort speichern">
+                <i class="fa-solid fa-floppy-disk"></i>
+                <span class="hidden xl:inline">Speichern</span>
+            </button>
+            <button onclick="toggleModal('settings-modal')" class="god-btn px-2.5 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/35 border border-amber-400/50 text-amber-300 font-semibold flex items-center gap-1" title="Einstellungen, Speichern & Hauptmenü">
+                <i class="fa-solid fa-sliders"></i>
+                <span class="hidden sm:inline">Menü</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- ===================================================================== -->
+    <!-- COSMIC EVENT / SAVE CONFIRMATION BANNER                               -->
+    <!-- ===================================================================== -->
+    <div id="cosmic-event-banner" class="fixed top-16 left-1/2 -translate-x-1/2 z-30 pointer-events-none hidden">
+        <div class="god-panel-gold rounded-2xl px-5 py-2.5 border-2 border-amber-400/80 shadow-[0_0_35px_rgba(251,191,36,0.45)] flex items-center gap-3 cosmic-banner-enter">
+            <span id="cosmic-event-icon" class="text-2xl">☄️</span>
+            <div>
+                <div id="cosmic-event-title" class="font-cinzel font-bold text-xs sm:text-sm text-amber-300 uppercase tracking-wider">EREIGNIS</div>
+                <div id="cosmic-event-desc" class="text-[11px] text-slate-200">Nachricht</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- INTERACTIVE TRAINING SESSION OVERLAY                                  -->
+    <!-- ===================================================================== -->
+    <div id="tutorial-overlay" class="fixed top-20 left-1/2 -translate-x-1/2 z-30 w-[94vw] max-w-xl pointer-events-auto hidden">
+        <div class="god-panel-gold rounded-2xl p-4 border-2 border-cyan-400/60 shadow-[0_0_30px_rgba(56,189,248,0.3)]">
+            <div class="flex items-center justify-between border-b border-slate-700/80 pb-2 mb-2">
+                <div class="flex items-center gap-2">
+                    <span class="px-2 py-0.5 rounded-md bg-cyan-500/20 border border-cyan-400/40 text-cyan-300 font-bold text-[10px] uppercase tracking-wider">
+                        🎓 GOD:less Training • <span id="tut-step-counter">Schritt 1 / 6</span>
+                    </span>
+                    <h3 id="tut-step-title" class="font-cinzel font-bold text-sm text-amber-300">Die Göttliche Perspektive</h3>
+                </div>
+                <button onclick="endTutorialSession(false)" class="text-[11px] text-slate-400 hover:text-white px-2 py-0.5 rounded bg-slate-800/80">
+                    Beenden ✕
+                </button>
+            </div>
+            <p id="tut-step-desc" class="text-xs text-slate-200 leading-relaxed mb-3">
+                Bewege deine Sicht mit <b>W, A, S, D</b> über das Flusstal und drehe die Perspektive mit <b>Q / E</b> oder gedrücktem Mausrad.
+            </p>
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2 text-[11px] text-emerald-300 font-medium" id="tut-step-task">
+                    <i class="fa-solid fa-circle-notch fa-spin"></i>
+                    <span>Aufgabe: Bewege oder drehe einmal die Kamera...</span>
+                </div>
+                <button onclick="advanceTutorialStep()" class="god-btn px-3 py-1 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/40 text-cyan-200 text-xs font-semibold">
+                    Nächster Schritt →
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- CONSCIENCE ADVISORS: LICHT (LEFT) & KRIEG (RIGHT)                     -->
+    <!-- ===================================================================== -->
+    <div id="advisor-angel" class="fixed top-20 left-4 z-20 max-w-xs god-panel rounded-2xl p-3 border-l-4 border-l-sky-400 pointer-events-none opacity-0 -translate-x-4 transition-all duration-300">
+        <div class="flex items-start gap-2.5">
+            <div class="w-8 h-8 rounded-full bg-sky-500/20 border border-sky-400/50 flex items-center justify-center shrink-0 text-sky-300">
+                <i class="fa-solid fa-dove"></i>
+            </div>
+            <div>
+                <div class="text-[10px] font-bold uppercase tracking-wider text-sky-300">Stimme der Schöpfung</div>
+                <p id="advisor-angel-text" class="text-xs text-slate-200 mt-0.5 leading-snug">
+                    „Deine Menschen errichten stolze Fachwerk- und Steinbauten. Schenke ihnen Segen!“
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div id="advisor-devil" class="fixed top-20 right-4 z-20 max-w-xs god-panel rounded-2xl p-3 border-r-4 border-r-rose-500 pointer-events-none opacity-0 translate-x-4 transition-all duration-300">
+        <div class="flex items-start gap-2.5">
+            <div class="w-8 h-8 rounded-full bg-rose-500/20 border border-rose-500/50 flex items-center justify-center shrink-0 text-rose-400">
+                <i class="fa-solid fa-fire-flame-curved"></i>
+            </div>
+            <div>
+                <div class="text-[10px] font-bold uppercase tracking-wider text-rose-400">Stimme der Dominanz</div>
+                <p id="advisor-devil-text" class="text-xs text-slate-200 mt-0.5 leading-snug">
+                    „Rüste deine Hopliten-Phalanx in der Festungskaserne aus und erobere die Insel!“
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- LEFT SIDEBAR: CUSTOM CREATURE AVATAR & REINFORCEMENT LEARNING         -->
+    <!-- ===================================================================== -->
+    <aside class="fixed left-2.5 top-1/2 -translate-y-1/2 z-20 w-64 flex flex-col gap-2.5 pointer-events-none hidden md:flex">
+        <div class="god-panel rounded-2xl p-3 pointer-events-auto">
+            <div class="flex items-center justify-between border-b border-slate-700/80 pb-2 mb-2">
+                <div class="flex items-center gap-2">
+                    <div id="creature-avatar-badge" class="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500/30 to-rose-600/30 border border-amber-400/50 flex items-center justify-center text-base text-amber-300">
+                        <i class="fa-solid fa-dragon"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-1.5">
+                            <h2 id="creature-name-display" class="font-cinzel font-bold text-xs text-amber-300 truncate max-w-[105px]">Aetherion</h2>
+                            <span id="creature-lvl-badge" class="text-[10px] px-1.5 py-0.2 bg-amber-500/20 text-amber-300 rounded font-bold">Lv.1</span>
+                        </div>
+                        <p id="creature-align-tag" class="text-[10px] text-slate-400">Eigene Schöpfung</p>
+                    </div>
+                </div>
+                <div class="flex gap-1">
+                    <button onclick="toggleModal('creature-forge-modal')" class="god-btn px-2 py-1 rounded-lg bg-amber-500/20 border border-amber-400/40 text-amber-200 text-[11px] font-semibold" title="Kreaturen-Designer öffnen">
+                        <i class="fa-solid fa-dna"></i>
+                    </button>
+                    <button onclick="toggleModal('creature-modal')" class="god-btn px-2 py-1 rounded-lg bg-purple-500/20 border border-purple-400/40 text-purple-200 text-[11px] font-semibold" title="Neuronales KI-Gehirn">
+                        <i class="fa-solid fa-brain"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Creature Vitals -->
+            <div class="space-y-1.5 text-[11px] mb-2.5">
+                <div>
+                    <div class="flex justify-between text-slate-300 mb-0.5">
+                        <span>Lebenskraft</span>
+                        <span id="creature-hp-text" class="text-emerald-300 font-semibold">100%</span>
+                    </div>
+                    <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                        <div id="creature-hp-bar" class="h-full bg-emerald-400 transition-all duration-300" style="width: 100%;"></div>
+                    </div>
+                </div>
+                <div>
+                    <div class="flex justify-between text-slate-300 mb-0.5">
+                        <span>Energie &amp; Sättigung</span>
+                        <span id="creature-hunger-text" class="text-amber-300 font-semibold">90%</span>
+                    </div>
+                    <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                        <div id="creature-hunger-bar" class="h-full bg-amber-400 transition-all duration-300" style="width: 90%;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Live Thought Bubble -->
+            <div class="bg-slate-900/90 border border-slate-700/80 rounded-xl p-2 mb-2.5">
+                <div class="text-[10px] text-slate-400 uppercase font-semibold">Aktueller Gedanke:</div>
+                <div class="text-xs text-amber-200 font-medium flex items-center gap-1.5 mt-0.5">
+                    <i class="fa-solid fa-comment-dots text-amber-400"></i>
+                    <span id="creature-thought-text" class="truncate">Wacht über die Siedlung</span>
+                </div>
+            </div>
+
+            <!-- 5 Creature Modes -->
+            <div class="text-[10px] text-slate-400 uppercase font-semibold mb-1">Befehls-Rolle:</div>
+            <div class="grid grid-cols-5 gap-1 mb-2.5">
+                <button onclick="setCreatureRole('free')" id="role-btn-free" class="god-btn p-1.5 rounded-lg bg-amber-500/20 border border-amber-400/50 text-center text-[10px] flex flex-col items-center gap-0.5" title="Freier Wille">
+                    <i class="fa-solid fa-compass text-amber-300"></i><span>Frei</span>
+                </button>
+                <button onclick="setCreatureRole('gatherer')" id="role-btn-gatherer" class="god-btn p-1.5 rounded-lg bg-slate-800/80 border border-slate-700 text-center text-[10px] flex flex-col items-center gap-0.5" title="Sammler">
+                    <i class="fa-solid fa-truck-ramp-box text-emerald-400"></i><span>Ernte</span>
+                </button>
+                <button onclick="setCreatureRole('builder')" id="role-btn-builder" class="god-btn p-1.5 rounded-lg bg-slate-800/80 border border-slate-700 text-center text-[10px] flex flex-col items-center gap-0.5" title="Baumeister">
+                    <i class="fa-solid fa-hammer text-sky-400"></i><span>Bau</span>
+                </button>
+                <button onclick="setCreatureRole('entertainer')" id="role-btn-entertainer" class="god-btn p-1.5 rounded-lg bg-slate-800/80 border border-slate-700 text-center text-[10px] flex flex-col items-center gap-0.5" title="Hüter & Entertainer">
+                    <i class="fa-solid fa-masks-theater text-pink-400"></i><span>Kult</span>
+                </button>
+                <button onclick="setCreatureRole('soldier')" id="role-btn-soldier" class="god-btn p-1.5 rounded-lg bg-slate-800/80 border border-slate-700 text-center text-[10px] flex flex-col items-center gap-0.5" title="Kriegs-Titan">
+                    <i class="fa-solid fa-khanda text-rose-400"></i><span>Krieg</span>
+                </button>
+            </div>
+
+            <!-- Reinforcement Learning Feedback Buttons -->
+            <div class="grid grid-cols-3 gap-1.5">
+                <button onclick="reinforceCreature(true)" class="god-btn py-1.5 px-2 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 text-[11px] font-semibold flex items-center justify-center gap-1">
+                    <span>👏</span><span>Loben</span>
+                </button>
+                <button onclick="feedCreatureDirectly()" class="god-btn py-1.5 px-2 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-[11px] font-semibold flex items-center justify-center gap-1">
+                    <span>🍖</span><span>Nähren</span>
+                </button>
+                <button onclick="reinforceCreature(false)" class="god-btn py-1.5 px-2 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 text-[11px] font-semibold flex items-center justify-center gap-1">
+                    <span>⚡</span><span>Züchtigen</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Held Object Status Card -->
+        <div class="god-panel rounded-2xl p-3 pointer-events-auto">
+            <div class="flex items-center justify-between">
+                <span class="text-[11px] font-cinzel font-bold text-amber-300 uppercase tracking-wider">
+                    <i class="fa-solid fa-hand-back-fist mr-1"></i>Hand Gottes
+                </span>
+                <span id="hand-mode-badge" class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold">
+                    Greifen &amp; Werfen
+                </span>
+            </div>
+            <div id="held-object-info" class="mt-1.5 text-xs text-slate-300 bg-slate-900/90 rounded-lg p-2 border border-slate-800">
+                Hand ist leer. <b>Linksklick</b> auf Menschen, Bäume oder Erzadern zum Greifen.
+            </div>
+        </div>
+    </aside>
+
+    <!-- ===================================================================== -->
+    <!-- RIGHT SIDEBAR: TRIBES, DISCORD PANTHEON & QUEST SCROLLS               -->
+    <!-- ===================================================================== -->
+    <aside class="fixed right-2.5 top-1/2 -translate-y-1/2 z-20 w-64 flex flex-col gap-2.5 pointer-events-none hidden lg:flex">
+        
+        <!-- Live Discord Pantheon Multiplayer Box -->
+        <div class="god-panel rounded-2xl p-3 pointer-events-auto border-indigo-500/40">
+            <div class="flex items-center justify-between border-b border-slate-700/80 pb-1.5 mb-2">
+                <span class="font-cinzel font-bold text-xs text-indigo-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <i class="fa-brands fa-discord text-indigo-400"></i>Discord Pantheon
+                </span>
+                <button onclick="toggleModal('discord-modal')" class="text-[10px] px-2 py-0.5 rounded bg-indigo-500/25 text-indigo-200 border border-indigo-400/40 hover:bg-indigo-500/40">
+                    Lobby
+                </button>
+            </div>
+            <div id="hud-discord-members" class="space-y-1.5 text-[11px] mb-2"></div>
+            <div class="flex gap-1.5">
+                <button onclick="sendQuickMultiplayerBlessing()" class="god-btn flex-1 py-1 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/35 border border-indigo-400/40 text-indigo-200 text-[10px] font-semibold">
+                    ⚡ Co-Op Segen
+                </button>
+                <button onclick="toggleModal('discord-modal')" class="god-btn flex-1 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-[10px] font-semibold">
+                    🔗 Einladen
+                </button>
+            </div>
+        </div>
+
+        <!-- Tribes Conquest Status -->
+        <div class="god-panel rounded-2xl p-3 pointer-events-auto">
+            <div class="flex items-center justify-between border-b border-slate-700/80 pb-1.5 mb-2">
+                <span class="font-cinzel font-bold text-xs text-amber-300 uppercase tracking-wider">
+                    <i class="fa-solid fa-chess-rook mr-1"></i>Nachbarreiche
+                </span>
+                <span class="text-[10px] text-slate-400">Eindruck / Garnison</span>
+            </div>
+            <div id="tribes-status-list" class="space-y-2 text-xs"></div>
+
+            <div class="mt-2.5 pt-2 border-t border-slate-800 flex items-center justify-between gap-1">
+                <button onclick="recruitPlatoon()" class="god-btn flex-1 py-1.5 px-2 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-200 text-[11px] font-semibold">
+                    <i class="fa-solid fa-shield-halved mr-1"></i>Hopliten (60🌾 40💎)
+                </button>
+                <button onclick="commandAllPlatoonsAttack()" class="god-btn py-1.5 px-2.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 text-[11px] font-semibold" title="Alle Regimenter zum Marsch befehlen">
+                    ⚔️ (<span id="platoon-count">0</span>)
+                </button>
+            </div>
+        </div>
+
+        <!-- Silver & Gold Scrolls -->
+        <div class="god-panel rounded-2xl p-3 pointer-events-auto">
+            <div class="flex items-center justify-between border-b border-slate-700/80 pb-1.5 mb-2">
+                <span class="font-cinzel font-bold text-xs text-amber-300 uppercase tracking-wider">
+                    <i class="fa-solid fa-scroll mr-1"></i>Chronik-Missionen
+                </span>
+                <span class="text-[10px] text-amber-400">+Tribut &amp; Glaube</span>
+            </div>
+            <div id="scrolls-list" class="space-y-1.5 max-h-36 overflow-y-auto pr-1"></div>
+        </div>
+    </aside>
+
+    <!-- ===================================================================== -->
+    <!-- BOTTOM DOCK: HAND OF GOD, AoE-STYLE BUILDINGS & GESTURE MIRACLES      -->
+    <!-- ===================================================================== -->
+    <footer class="fixed bottom-2.5 left-1/2 -translate-x-1/2 z-20 w-[96vw] max-w-5xl pointer-events-none">
+        <div class="god-panel rounded-2xl px-3 py-2 pointer-events-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+            
+            <!-- Left: Primary Hand Mode -->
+            <div class="flex items-center gap-1.5 border-b sm:border-b-0 sm:border-r border-slate-700/80 pb-1.5 sm:pb-0 sm:pr-2.5">
+                <button onclick="setInteractionMode('hand')" id="mode-btn-hand" class="god-btn px-3 py-2 rounded-xl bg-amber-500/25 border border-amber-400 text-amber-200 text-xs font-semibold flex items-center gap-1.5">
+                    <i class="fa-solid fa-hand-sparkles text-base"></i>
+                    <div class="text-left leading-tight">
+                        <div>Hand Gottes</div>
+                        <div class="text-[9px] text-amber-300/80">Greifen / Werfen</div>
+                    </div>
+                </button>
+            </div>
+
+            <!-- Center: Detailed AoE-Style Settlement Buildings -->
+            <div class="flex items-center gap-1.5 overflow-x-auto max-w-full py-0.5">
+                <span class="text-[10px] font-cinzel text-slate-400 uppercase tracking-wider hidden xl:inline mr-1">Architektur:</span>
+                <button onclick="selectBuildType('house')" id="build-btn-house" class="god-btn px-2.5 py-1.5 rounded-xl bg-slate-800/90 border border-slate-700 text-xs flex flex-col items-center min-w-[68px]" title="Bürgerhaus mit Ziegeldach & Hof (+5 Wohnraum, +15 Eindruck)">
+                    <span class="text-sm">🏘️</span>
+                    <span class="font-semibold text-[11px] text-slate-200">Hofhaus</span>
+                    <span class="text-[9px] text-emerald-400">35🌲</span>
+                </button>
+                <button onclick="selectBuildType('farm')" id="build-btn-farm" class="god-btn px-2.5 py-1.5 rounded-xl bg-slate-800/90 border border-slate-700 text-xs flex flex-col items-center min-w-[68px]" title="Windmühle & Weizenfeld (+Nahrung)">
+                    <span class="text-sm">🌾</span>
+                    <span class="font-semibold text-[11px] text-slate-200">Mühlhof</span>
+                    <span class="text-[9px] text-emerald-400">25🌲</span>
+                </button>
+                <button onclick="selectBuildType('storehouse')" id="build-btn-storehouse" class="god-btn px-2.5 py-1.5 rounded-xl bg-slate-800/90 border border-slate-700 text-xs flex flex-col items-center min-w-[68px]" title="Handels-Speicher mit Lastkran">
+                    <span class="text-sm">🏗️</span>
+                    <span class="font-semibold text-[11px] text-slate-200">Speicher</span>
+                    <span class="text-[9px] text-emerald-400">45🌲 15💎</span>
+                </button>
+                <button onclick="selectBuildType('barracks')" id="build-btn-barracks" class="god-btn px-2.5 py-1.5 rounded-xl bg-slate-800/90 border border-slate-700 text-xs flex flex-col items-center min-w-[68px]" title="Befestigte Garnison (Hopliten & +Krieg)">
+                    <span class="text-sm">🏰</span>
+                    <span class="font-semibold text-[11px] text-slate-200">Garnison</span>
+                    <span class="text-[9px] text-sky-300">50🌲 40💎</span>
+                </button>
+                <button onclick="selectBuildType('garden')" id="build-btn-garden" class="god-btn px-2.5 py-1.5 rounded-xl bg-slate-800/90 border border-sky-500/30 text-xs flex flex-col items-center min-w-[68px]" title="Marmor-Brunnenanlage (+Gut & +45 Eindruck)">
+                    <span class="text-sm">⛲</span>
+                    <span class="font-semibold text-[11px] text-sky-200">Brunnen</span>
+                    <span class="text-[9px] text-sky-300">30🌲 10💎</span>
+                </button>
+                <button onclick="selectBuildType('spikes')" id="build-btn-spikes" class="god-btn px-2.5 py-1.5 rounded-xl bg-slate-800/90 border border-rose-500/30 text-xs flex flex-col items-center min-w-[68px]" title="Dunkles Richtmal (+Böse & Einschüchterung)">
+                    <span class="text-sm">🩸</span>
+                    <span class="font-semibold text-[11px] text-rose-200">Richtmal</span>
+                    <span class="text-[9px] text-rose-300">20🌲 30💎</span>
+                </button>
+                <button onclick="selectBuildType('obelisk')" id="build-btn-obelisk" class="god-btn px-2.5 py-1.5 rounded-xl bg-slate-800/90 border border-amber-500/30 text-xs flex flex-col items-center min-w-[68px]" title="Kaiserliches Monument (+90 Eindruck & Mana)">
+                    <span class="text-sm">🏛️</span>
+                    <span class="font-semibold text-[11px] text-amber-200">Monument</span>
+                    <span class="text-[9px] text-amber-300">60🌲 60💎</span>
+                </button>
+            </div>
+
+            <!-- Right: Gesture Miracles -->
+            <div class="flex items-center gap-1.5 border-t sm:border-t-0 sm:border-l border-slate-700/80 pt-1.5 sm:pt-0 sm:pl-2.5">
+                <button onclick="selectMiracleType('water')" id="miracle-btn-water" class="god-btn px-2 py-1.5 rounded-xl bg-sky-950/80 border border-sky-500/40 text-xs flex flex-col items-center min-w-[54px]" title="Segensregen (Taste 1 | Rechtsklick-Geste: Spirale)">
+                    <span class="text-sm">🌧️</span>
+                    <span class="text-[10px] font-semibold text-sky-200">Regen</span>
+                    <span class="text-[9px] text-purple-300">35✨</span>
+                </button>
+                <button onclick="selectMiracleType('heal')" id="miracle-btn-heal" class="god-btn px-2 py-1.5 rounded-xl bg-emerald-950/80 border border-emerald-500/40 text-xs flex flex-col items-center min-w-[54px]" title="Heilendes Licht (Taste 2 | Rechtsklick-Geste: Kreuz)">
+                    <span class="text-sm">💚</span>
+                    <span class="text-[10px] font-semibold text-emerald-200">Heilung</span>
+                    <span class="text-[9px] text-purple-300">45✨</span>
+                </button>
+                <button onclick="selectMiracleType('fireball')" id="miracle-btn-fireball" class="god-btn px-2 py-1.5 rounded-xl bg-orange-950/80 border border-orange-500/40 text-xs flex flex-col items-center min-w-[54px]" title="Kometenfeuer (Taste 3 | Rechtsklick-Geste: Kreis)">
+                    <span class="text-sm">☄️</span>
+                    <span class="text-[10px] font-semibold text-orange-200">Komet</span>
+                    <span class="text-[9px] text-purple-300">55✨</span>
+                </button>
+                <button onclick="selectMiracleType('lightning')" id="miracle-btn-lightning" class="god-btn px-2 py-1.5 rounded-xl bg-yellow-950/80 border border-yellow-500/40 text-xs flex flex-col items-center min-w-[54px]" title="Götterblitz (Taste 4 | Rechtsklick-Geste: Zick-Zack)">
+                    <span class="text-sm">⚡</span>
+                    <span class="text-[10px] font-semibold text-yellow-200">Blitz</span>
+                    <span class="text-[9px] text-purple-300">70✨</span>
+                </button>
+                <button onclick="selectMiracleType('volcano')" id="miracle-btn-volcano" class="god-btn px-2 py-1.5 rounded-xl bg-rose-950/90 border border-rose-500/60 text-xs flex flex-col items-center min-w-[58px]" title="Kataklysmus-Vulkan (Taste 5 | Rechtsklick-Geste: Dreieck △)">
+                    <span class="text-sm">🌋</span>
+                    <span class="text-[10px] font-bold text-rose-200">Vulkan</span>
+                    <span class="text-[9px] text-purple-300">150✨</span>
+                </button>
+            </div>
+        </div>
+    </footer>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL 1: CUSTOM CREATURE DESIGNER (GÖTTLICHE KREATUREN-SCHMIEDE)      -->
+    <!-- ===================================================================== -->
+    <div id="creature-forge-modal" class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md hidden items-center justify-center p-4">
+        <div class="god-panel-gold rounded-3xl max-w-3xl w-full p-6 border border-amber-400/60 shadow-2xl max-h-[92vh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b border-slate-700 pb-3 mb-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-11 h-11 rounded-2xl bg-amber-500/20 border border-amber-400/50 flex items-center justify-center text-2xl text-amber-300">
+                        <i class="fa-solid fa-dna"></i>
+                    </div>
+                    <div>
+                        <h2 class="font-cinzel font-black text-lg text-amber-300">GÖTTLICHE KREATUREN-SCHMIEDE</h2>
+                        <p class="text-xs text-slate-400">Erschaffe deine eigene mythische Kreatur in 3D (Anatomie, Hörner, Schwingen &amp; Aura)</p>
+                    </div>
+                </div>
+                <button onclick="toggleModal('creature-forge-modal')" class="god-btn w-8 h-8 rounded-lg bg-slate-800 text-slate-300 hover:text-white">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                <!-- Left Column: Name, Stature & Anatomy Parts -->
+                <div class="space-y-3 bg-slate-900/90 p-4 rounded-2xl border border-slate-800">
+                    <div>
+                        <label class="block text-amber-300 font-bold uppercase tracking-wider mb-1">1. Name deiner Schöpfung:</label>
+                        <input id="forge-name-input" type="text" value="Aetherion" oninput="applyCreatureForgeChanges()" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-semibold focus:border-amber-400 outline-none">
+                    </div>
+
+                    <div>
+                        <label class="block text-amber-300 font-bold uppercase tracking-wider mb-1">2. Körperbau &amp; Statur:</label>
+                        <select id="forge-body-select" onchange="applyCreatureForgeChanges()" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 outline-none">
+                            <option value="titan">Bipedaler Halbgott-Titan (Athletisch &amp; Aufrecht)</option>
+                            <option value="colossus">Gepanzerter Behemoth-Koloss (Massiv &amp; Breit)</option>
+                            <option value="predator">Geschmeidiger Schatten-Jäger (Schnell &amp; Dynamisch)</option>
+                            <option value="seraph">Astraler Seraphim-Wächter (Erhaben &amp; Schlank)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-amber-300 font-bold uppercase tracking-wider mb-1">3. Kopf-Krone &amp; Hörner:</label>
+                        <select id="forge-horns-select" onchange="applyCreatureForgeChanges()" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 outline-none">
+                            <option value="dragon">Geschwungene Drachen-Hörner</option>
+                            <option value="halo">Schwebender Sonnen-Heiligenschein</option>
+                            <option value="antlers">Mystisches Wächter-Geweih</option>
+                            <option value="crown">Goldene Imperatoren-Krone</option>
+                            <option value="none">Keine Hörner (Reines Haupt)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-amber-300 font-bold uppercase tracking-wider mb-1">4. Rücken-Morph &amp; Schwingen:</label>
+                        <select id="forge-wings-select" onchange="applyCreatureForgeChanges()" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 outline-none">
+                            <option value="angel">Gefiederte Erzengel-Schwingen</option>
+                            <option value="demon">Gezackte Dämonen-Schwingen</option>
+                            <option value="crystals">Leuchtende Ley-Kristall-Stacheln</option>
+                            <option value="none">Kein Rücken-Attribut</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-amber-300 font-bold uppercase tracking-wider mb-1">5. Schweif- &amp; Klauen-Mutation:</label>
+                        <select id="forge-tail-select" onchange="applyCreatureForgeChanges()" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 outline-none">
+                            <option value="blade">Klingen-Schweif &amp; Kriegsklauen</option>
+                            <option value="flame">Lebendige Flammen-Quaste</option>
+                            <option value="none">Kein Schweif</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Right Column: Colors, Proportions & Specialization -->
+                <div class="space-y-3 bg-slate-900/90 p-4 rounded-2xl border border-slate-800 flex flex-col justify-between">
+                    <div class="space-y-3">
+                        <div class="font-bold text-amber-300 uppercase tracking-wider">6. Haut-, Panzer- &amp; Aura-Farben</div>
+                        <div class="grid grid-cols-3 gap-2">
+                            <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-center">
+                                <label class="block text-[10px] text-slate-400 mb-1">Hauptfarbe</label>
+                                <input id="forge-color-primary" type="color" value="#d97706" oninput="applyCreatureForgeChanges()" class="w-full h-8 rounded cursor-pointer bg-transparent">
+                            </div>
+                            <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-center">
+                                <label class="block text-[10px] text-slate-400 mb-1">Rüstung / Mähne</label>
+                                <input id="forge-color-secondary" type="color" value="#7c2d12" oninput="applyCreatureForgeChanges()" class="w-full h-8 rounded cursor-pointer bg-transparent">
+                            </div>
+                            <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-center">
+                                <label class="block text-[10px] text-slate-400 mb-1">Göttliche Aura</label>
+                                <input id="forge-color-aura" type="color" value="#38bdf8" oninput="applyCreatureForgeChanges()" class="w-full h-8 rounded cursor-pointer bg-transparent">
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+                            <div class="flex justify-between font-semibold text-amber-200 mb-1">
+                                <span>Körpergröße &amp; Muskelmasse</span>
+                                <span id="forge-scale-label">100%</span>
+                            </div>
+                            <input id="forge-scale-slider" type="range" min="80" max="145" value="100" oninput="applyCreatureForgeChanges()" class="w-full accent-amber-400">
+                        </div>
+
+                        <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+                            <div class="text-[11px] font-bold text-cyan-300 mb-1">Vorschau-Zusammenfassung:</div>
+                            <p id="forge-live-desc" class="text-[11px] text-slate-300 leading-relaxed">
+                                Dein Avatar wird sofort in Echtzeit in der 3D-Welt neu geformt.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col sm:flex-row gap-2 pt-2">
+                        <button onclick="randomizeCustomCreature()" class="god-btn flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-amber-400/40 text-amber-300 font-bold">
+                            🎲 Zufalls-Genetik
+                        </button>
+                        <button onclick="toggleModal('creature-forge-modal'); focusCameraOn('creature');" class="god-btn flex-1 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 font-cinzel font-black uppercase tracking-wider">
+                            ✓ Kreatur Übernehmen
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL 2: SETTINGS, SAVE/LOAD GAME & RETURN TO START SCREEN            -->
+    <!-- ===================================================================== -->
+    <div id="settings-modal" class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md hidden items-center justify-center p-4">
+        <div class="god-panel-gold rounded-3xl max-w-2xl w-full p-6 border border-emerald-400/50 shadow-2xl max-h-[92vh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b border-slate-700 pb-3 mb-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/50 flex items-center justify-center text-lg text-emerald-300">
+                        <i class="fa-solid fa-sliders"></i>
+                    </div>
+                    <div>
+                        <h2 class="font-cinzel font-bold text-lg text-emerald-300">GOD:LESS • EINSTELLUNGEN &amp; SPIELSTAND</h2>
+                        <p class="text-xs text-slate-400">Spiel speichern, laden, Grafik konfigurieren oder zum Startbildschirm zurückkehren</p>
+                    </div>
+                </div>
+                <button onclick="toggleModal('settings-modal')" class="god-btn w-8 h-8 rounded-lg bg-slate-800 text-slate-300 hover:text-white">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Save & Return to Start Screen Action Box -->
+            <div class="bg-slate-900/95 p-4 rounded-2xl border border-amber-400/40 mb-4">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="font-cinzel font-bold text-xs uppercase tracking-wider text-amber-300">
+                        <i class="fa-solid fa-floppy-disk mr-1.5"></i>Spielstand-Verwaltung &amp; Hauptmenü
+                    </span>
+                    <span id="settings-save-status" class="text-[11px] text-emerald-300 font-semibold">Bereit zum Speichern</span>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                    <button onclick="saveCurrentGame(true)" class="god-btn py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold flex items-center justify-center gap-1.5 shadow-lg">
+                        <i class="fa-solid fa-floppy-disk"></i>
+                        <span>Spiel Speichern</span>
+                    </button>
+                    <button onclick="loadSavedGame(false)" class="god-btn py-2.5 px-3 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold flex items-center justify-center gap-1.5 shadow-lg">
+                        <i class="fa-solid fa-folder-open"></i>
+                        <span>Spielstand Laden</span>
+                    </button>
+                    <button onclick="saveAndReturnToStartScreen()" class="god-btn py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-rose-600 text-white font-bold flex items-center justify-center gap-1.5 shadow-lg">
+                        <i class="fa-solid fa-house"></i>
+                        <span>Speichern &amp; Startmenü</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Engine & Gameplay Sliders -->
+            <div class="space-y-3 text-xs">
+                <div class="bg-slate-900/90 p-3.5 rounded-xl border border-slate-800">
+                    <div class="flex justify-between font-semibold text-amber-300 mb-1">
+                        <span>⚡ Interaktiver Maus-Blitz-Effekt</span>
+                        <span id="lbl-setting-lightning">Hoch (Immer aktiv)</span>
+                    </div>
+                    <input id="inp-setting-lightning" type="range" min="0" max="2" value="2" oninput="applyGameSettings()" class="w-full accent-amber-400">
+                </div>
+
+                <div class="bg-slate-900/90 p-3.5 rounded-xl border border-slate-800">
+                    <div class="flex justify-between font-semibold text-sky-300 mb-1">
+                        <span>🏔️ Age of Empires IV Grafik- &amp; Schatten-Auflösung</span>
+                        <span id="lbl-setting-graphics">Ultra (Hohe Pixel-Dichte)</span>
+                    </div>
+                    <input id="inp-setting-graphics" type="range" min="1" max="3" value="3" oninput="applyGameSettings()" class="w-full accent-sky-400">
+                </div>
+
+                <div class="bg-slate-900/90 p-3.5 rounded-xl border border-slate-800">
+                    <div class="flex justify-between font-semibold text-purple-300 mb-1">
+                        <span>⏳ Zeitgeschwindigkeit (1x = Ruhige, realistische Geschwindigkeit)</span>
+                        <span id="lbl-setting-timespeed">1x (Realistisch langsam)</span>
+                    </div>
+                    <input id="inp-setting-timespeed" type="range" min="1" max="4" value="1" oninput="applyGameSettings()" class="w-full accent-purple-400">
+                </div>
+
+                <div class="bg-slate-900/90 p-3.5 rounded-xl border border-slate-800">
+                    <div class="flex justify-between font-semibold text-emerald-300 mb-1">
+                        <span>🎥 Kamera-Schwenkgeschwindigkeit</span>
+                        <span id="lbl-setting-camspeed">52</span>
+                    </div>
+                    <input id="inp-setting-camspeed" type="range" min="25" max="90" value="52" oninput="applyGameSettings()" class="w-full accent-emerald-400">
+                </div>
+            </div>
+
+            <div class="mt-5 flex flex-wrap items-center justify-between gap-2">
+                <button onclick="returnToStartScreen()" class="god-btn px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 text-xs font-semibold">
+                    ← Ohne Speichern zum Startbildschirm
+                </button>
+                <button onclick="toggleModal('settings-modal')" class="god-btn px-6 py-2 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 text-slate-950 font-cinzel font-bold text-xs">
+                    Fertig &amp; Weiterzocken
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL 3: DISCORD MULTIPLAYER & PANTHEON SERVER BRIDGE                 -->
+    <!-- ===================================================================== -->
+    <div id="discord-modal" class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md hidden items-center justify-center p-4">
+        <div class="god-panel-gold rounded-3xl max-w-2xl w-full p-6 border border-indigo-400/50 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b border-slate-700 pb-3 mb-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-11 h-11 rounded-2xl bg-indigo-600/30 border border-indigo-400/50 flex items-center justify-center text-2xl text-indigo-300">
+                        <i class="fa-brands fa-discord"></i>
+                    </div>
+                    <div>
+                        <h2 class="font-cinzel font-bold text-lg text-indigo-300">GOD:LESS • DISCORD-PANTHEON</h2>
+                        <p class="text-xs text-slate-400">Verbinde deinen Discord-Server und spiele mit deinen Freunden</p>
+                    </div>
+                </div>
+                <button onclick="toggleModal('discord-modal')" class="god-btn w-8 h-8 rounded-lg bg-slate-800 text-slate-300 hover:text-white">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5 text-xs">
+                <div class="bg-slate-900/90 p-4 rounded-2xl border border-slate-800 space-y-3">
+                    <div class="font-bold text-indigo-300 uppercase tracking-wider">1. Discord-Server Verknüpfen</div>
+                    <div>
+                        <label class="block text-slate-400 mb-1">Dein Götter-Name (Discord-Tag):</label>
+                        <input id="discord-username-input" type="text" value="GodlessRuler#0001" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 mb-1">Discord Server-ID oder Invite-Link:</label>
+                        <input id="discord-server-input" type="text" value="discord.gg/godless-pantheon" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 mb-1">Optional: Discord-Channel Webhook-URL:</label>
+                        <input id="discord-webhook-input" type="text" placeholder="https://discord.com/api/webhooks/..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 outline-none">
+                    </div>
+                    <div class="flex gap-2 pt-1">
+                        <button onclick="connectDiscordServer()" class="god-btn flex-1 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold">
+                            <i class="fa-brands fa-discord mr-1"></i>Server Verbinden
+                        </button>
+                        <button onclick="sendDiscordWebhookTest()" class="god-btn px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-indigo-400/40 text-indigo-200 font-semibold">
+                            📡 Webhook-Ping
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900/90 p-4 rounded-2xl border border-slate-800 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="font-bold text-purple-300 uppercase tracking-wider">2. Pantheon Raum-Lobby</span>
+                            <span id="lobby-code-badge" class="px-2 py-0.5 rounded bg-purple-500/20 border border-purple-400/40 text-purple-200 font-mono font-bold">GDL-7749</span>
+                        </div>
+                        <div id="modal-discord-party-list" class="space-y-2 mb-3"></div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <div class="flex gap-2">
+                            <button onclick="simulateFriendJoinDiscord()" class="god-btn flex-1 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/40 text-emerald-200 font-semibold">
+                                <i class="fa-solid fa-user-plus mr-1"></i>Freund hinzufügen
+                            </button>
+                            <button onclick="copyDiscordInviteLink()" class="god-btn px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-amber-300 font-semibold">
+                                <i class="fa-solid fa-copy"></i>
+                            </button>
+                        </div>
+                        <button onclick="startGameSession('multiplayer')" class="god-btn w-full py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white font-cinzel font-black text-xs uppercase tracking-wider shadow-lg">
+                            ⚡ Multiplayer-Welt starten →
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="discord-feedback-banner" class="text-xs text-center py-2 px-3 rounded-xl bg-indigo-950/60 border border-indigo-500/30 text-indigo-200">
+                Status: Bereit für Discord-Server-Synchronisation.
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL 4: CREATURE NEURAL BRAIN MATRIX                                 -->
+    <!-- ===================================================================== -->
+    <div id="creature-modal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md hidden items-center justify-center p-4">
+        <div class="god-panel-gold rounded-3xl max-w-xl w-full p-6 border border-purple-400/40 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b border-slate-700 pb-3 mb-4">
+                <div>
+                    <h2 class="font-cinzel font-bold text-lg text-amber-300">NEURONALES KREATUREN-GEHIRN</h2>
+                    <p class="text-xs text-slate-400">Verhaltens-Gewichtung deines geschaffenen Avatars</p>
+                </div>
+                <button onclick="toggleModal('creature-modal')" class="god-btn w-8 h-8 rounded-lg bg-slate-800 text-slate-300 hover:text-white">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="space-y-3 text-xs">
+                <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                    <div class="flex justify-between mb-1 font-semibold text-emerald-300">
+                        <span>🌲 Rohstoffe ernten &amp; einlagern</span>
+                        <span id="weight-val-gather">70%</span>
+                    </div>
+                    <input type="range" min="0" max="100" value="70" oninput="updateCreatureWeight('gather', this.value)" class="w-full accent-emerald-400">
+                </div>
+                <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                    <div class="flex justify-between mb-1 font-semibold text-sky-300">
+                        <span>🏗️ Bauwerke der Stadt unterstützen</span>
+                        <span id="weight-val-build">65%</span>
+                    </div>
+                    <input type="range" min="0" max="100" value="65" oninput="updateCreatureWeight('build', this.value)" class="w-full accent-sky-400">
+                </div>
+                <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                    <div class="flex justify-between mb-1 font-semibold text-pink-300">
+                        <span>🎭 Volk inspirieren (+Glaube &amp; Eindruck)</span>
+                        <span id="weight-val-entertain">60%</span>
+                    </div>
+                    <input type="range" min="0" max="100" value="60" oninput="updateCreatureWeight('entertain', this.value)" class="w-full accent-pink-400">
+                </div>
+                <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                    <div class="flex justify-between mb-1 font-semibold text-rose-300">
+                        <span>⚔️ Feindliche Garnisonen bekämpfen</span>
+                        <span id="weight-val-attack">45%</span>
+                    </div>
+                    <input type="range" min="0" max="100" value="45" oninput="updateCreatureWeight('attack', this.value)" class="w-full accent-rose-400">
+                </div>
+            </div>
+
+            <div class="mt-5 flex justify-end">
+                <button onclick="toggleModal('creature-modal')" class="god-btn px-5 py-2 rounded-xl bg-amber-500 text-slate-950 font-bold text-xs">
+                    Schließen
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL 5: TRIBUTE CHAMBER (UPGRADES)                                   -->
+    <!-- ===================================================================== -->
+    <div id="tribute-modal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md hidden items-center justify-center p-4">
+        <div class="god-panel-gold rounded-3xl max-w-2xl w-full p-6 border border-amber-400/40 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b border-slate-700 pb-3 mb-4">
+                <div>
+                    <h2 class="font-cinzel font-bold text-lg text-amber-300">KAISERLICHE TRIBUT-KAMMER</h2>
+                    <p class="text-xs text-slate-400">Schalte göttliche Technologien und Segnungen frei</p>
+                </div>
+                <button onclick="toggleModal('tribute-modal')" class="god-btn w-8 h-8 rounded-lg bg-slate-800 text-slate-300 hover:text-white">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div id="tribute-upgrades-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs"></div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- JAVASCRIPT ENGINE: PBR TEXTURES, AoE-IV MESHES, CREATURE FORGE & SAVE -->
+    <!-- ===================================================================== -->
+    <script>
+        /**********************************************************************
+         * 1. WEB AUDIO SYNTHESIZER
+         **********************************************************************/
+        const SoundFX = {
+            ctx: null,
+            enabled: true,
+            init() {
+                if (!this.ctx) {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    if (AudioCtx) this.ctx = new AudioCtx();
+                }
+                if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+            },
+            playTone(freq, type = 'sine', duration = 0.18, vol = 0.11, slideTo = null) {
+                if (!this.enabled) return;
+                try {
+                    this.init();
+                    if (!this.ctx) return;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                    if (slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, this.ctx.currentTime + duration);
+                    gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + duration);
+                } catch (e) {}
+            },
+            electricZaps() { this.playTone(160, 'sawtooth', 0.08, 0.04, 620); },
+            grab() { this.playTone(300, 'sine', 0.12, 0.11, 540); },
+            drop() { this.playTone(440, 'triangle', 0.15, 0.11, 220); },
+            throwObj() { this.playTone(240, 'sawtooth', 0.25, 0.13, 780); },
+            build() { this.playTone(260, 'triangle', 0.18, 0.13, 520); },
+            miracleGood() {
+                this.playTone(523.25, 'sine', 0.32, 0.11, 659.25);
+                setTimeout(() => this.playTone(783.99, 'sine', 0.38, 0.11, 1046.5), 110);
+            },
+            miracleEvil() { this.playTone(145, 'sawtooth', 0.42, 0.15, 62); },
+            praise() { this.playTone(440, 'sine', 0.22, 0.11, 880); },
+            slap() { this.playTone(130, 'square', 0.16, 0.15, 55); }
+        };
+
+        /**********************************************************************
+         * 2. INTERACTIVE MOUSE-TRIGGERED LIGHTNING & SPARKS ENGINE
+         **********************************************************************/
+        const LightningFX = {
+            canvas: null,
+            ctx: null,
+            mouseX: window.innerWidth * 0.5,
+            mouseY: window.innerHeight * 0.5,
+            sparks: [],
+            bolts: [],
+            intensityMode: 2,
+
+            init() {
+                this.canvas = document.getElementById('lightning-fx-canvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.resize();
+                window.addEventListener('resize', () => this.resize());
+
+                window.addEventListener('mousemove', (e) => {
+                    const dx = e.clientX - this.mouseX;
+                    const dy = e.clientY - this.mouseY;
+                    const speed = Math.hypot(dx, dy);
+                    this.mouseX = e.clientX;
+                    this.mouseY = e.clientY;
+                    if (!this.shouldRender()) return;
+
+                    const isGoodSide = this.mouseX > window.innerWidth * 0.5;
+                    const color = isGoodSide ? '#38bdf8' : '#f43f5e';
+
+                    for (let i = 0; i < Math.min(4, Math.ceil(speed / 12)); i++) {
+                        this.sparks.push({
+                            x: this.mouseX + (Math.random() - 0.5) * 12,
+                            y: this.mouseY + (Math.random() - 0.5) * 12,
+                            vx: (Math.random() - 0.5) * 3.6 - dx * 0.05,
+                            vy: (Math.random() - 0.5) * 3.6 - dy * 0.05,
+                            life: 1.0,
+                            color: Math.random() > 0.35 ? color : '#fde047',
+                            size: 1.8 + Math.random() * 2.4
+                        });
+                    }
+
+                    const startVisible = !document.getElementById('start-screen').classList.contains('hidden');
+                    const boltChance = startVisible ? 0.42 : 0.14;
+                    if (speed > 7 && Math.random() < boltChance) {
+                        const angle = Math.random() * Math.PI * 2;
+                        const radius = startVisible ? (70 + Math.random() * 130) : (35 + Math.random() * 55);
+                        this.spawnBolt(
+                            this.mouseX + Math.cos(angle) * radius,
+                            this.mouseY + Math.sin(angle) * radius,
+                            this.mouseX,
+                            this.mouseY,
+                            isGoodSide
+                        );
+                    }
+                });
+
+                window.addEventListener('mousedown', (e) => {
+                    if (!this.shouldRender()) return;
+                    const isGoodSide = e.clientX > window.innerWidth * 0.5;
+                    for (let k = 0; k < 4; k++) {
+                        const angle = (k / 4) * Math.PI * 2 + Math.random() * 0.6;
+                        const dist = 80 + Math.random() * 100;
+                        this.spawnBolt(
+                            e.clientX + Math.cos(angle) * dist,
+                            e.clientY + Math.sin(angle) * dist,
+                            e.clientX,
+                            e.clientY,
+                            isGoodSide
+                        );
+                    }
+                    if (!GameState.started) SoundFX.electricZaps();
+                });
+            },
+
+            resize() {
+                if (!this.canvas) return;
+                this.canvas.width = window.innerWidth;
+                this.canvas.height = window.innerHeight;
+            },
+
+            shouldRender() {
+                if (this.intensityMode === 0) return false;
+                const startVisible = !document.getElementById('start-screen').classList.contains('hidden');
+                if (this.intensityMode === 1 && !startVisible) return false;
+                return true;
+            },
+
+            spawnBolt(x1, y1, x2, y2, isGood) {
+                const points = [{ x: x1, y: y1 }];
+                const steps = 8;
+                for (let i = 1; i < steps; i++) {
+                    const t = i / steps;
+                    const jitter = (1 - Math.abs(t - 0.5) * 2) * 32;
+                    points.push({
+                        x: x1 + (x2 - x1) * t + (Math.random() - 0.5) * jitter,
+                        y: y1 + (y2 - y1) * t + (Math.random() - 0.5) * jitter
+                    });
+                }
+                points.push({ x: x2, y: y2 });
+                this.bolts.push({
+                    points,
+                    life: 1.0,
+                    color: isGood ? '#38bdf8' : '#f43f5e',
+                    glowColor: isGood ? 'rgba(56, 189, 248, 0.8)' : 'rgba(244, 63, 94, 0.8)'
+                });
+            },
+
+            updateAndDraw(dt) {
+                if (!this.ctx) return;
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                if (!this.shouldRender()) return;
+
+                for (let i = this.bolts.length - 1; i >= 0; i--) {
+                    const b = this.bolts[i];
+                    b.life -= dt * 7.5;
+                    if (b.life <= 0) { this.bolts.splice(i, 1); continue; }
+                    this.ctx.save();
+                    this.ctx.globalAlpha = Math.max(0, b.life);
+                    this.ctx.strokeStyle = b.color;
+                    this.ctx.shadowColor = b.glowColor;
+                    this.ctx.shadowBlur = 14;
+                    this.ctx.lineWidth = 2.3 * b.life;
+                    this.ctx.beginPath();
+                    b.points.forEach((pt, idx) => {
+                        if (idx === 0) this.ctx.moveTo(pt.x, pt.y);
+                        else this.ctx.lineTo(pt.x, pt.y);
+                    });
+                    this.ctx.stroke();
+                    this.ctx.strokeStyle = '#ffffff';
+                    this.ctx.lineWidth = 0.9 * b.life;
+                    this.ctx.stroke();
+                    this.ctx.restore();
+                }
+
+                for (let i = this.sparks.length - 1; i >= 0; i--) {
+                    const s = this.sparks[i];
+                    s.x += s.vx;
+                    s.y += s.vy;
+                    s.life -= dt * 2.6;
+                    if (s.life <= 0) { this.sparks.splice(i, 1); continue; }
+                    this.ctx.save();
+                    this.ctx.globalAlpha = Math.max(0, s.life);
+                    this.ctx.fillStyle = s.color;
+                    this.ctx.beginPath();
+                    this.ctx.arc(s.x, s.y, s.size * s.life, 0, Math.PI * 2);
+                    this.ctx.fill();
+                    this.ctx.restore();
+                }
+            }
+        };
+
+        function tiltCard3D(event, cardEl) {
+            const rect = cardEl.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            const rotateX = ((y - rect.height / 2) / (rect.height / 2)) * -7;
+            const rotateY = ((x - rect.width / 2) / (rect.width / 2)) * 7;
+            cardEl.style.transform = `translateY(-8px) scale(1.03) rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg)`;
+        }
+        function resetCard3D(cardEl) { cardEl.style.transform = ''; }
+        function scrollModeCards(dir) {
+            const scroller = document.getElementById('ungodly-scroller');
+            if (scroller) {
+                scroller.scrollBy({ left: dir * 320, behavior: 'smooth' });
+                SoundFX.electricZaps();
+            }
+        }
+
+        /**********************************************************************
+         * 3. PROCEDURAL PBR TEXTURE GENERATOR (Terrain, Masonry Stone, Roofs)
+         **********************************************************************/
+        const ProceduralTextures = {
+            terrainBump: null,
+            stoneWall: null,
+            roofTiles: null,
+            woodPlanks: null,
+
+            init() {
+                this.terrainBump = this.createNoiseTexture(256, 256, 28, 0.35);
+                this.terrainBump.wrapS = this.terrainBump.wrapT = THREE.RepeatWrapping;
+                this.terrainBump.repeat.set(18, 18);
+
+                this.stoneWall = this.createMasonryTexture();
+                this.stoneWall.wrapS = this.stoneWall.wrapT = THREE.RepeatWrapping;
+                this.stoneWall.repeat.set(2, 2);
+
+                this.roofTiles = this.createRoofTileTexture();
+                this.roofTiles.wrapS = this.roofTiles.wrapT = THREE.RepeatWrapping;
+                this.roofTiles.repeat.set(3, 3);
+
+                this.woodPlanks = this.createWoodTexture();
+            },
+
+            createNoiseTexture(w, h, scale = 16, contrast = 0.4) {
+                const canvas = document.createElement('canvas');
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                const imgData = ctx.createImageData(w, h);
+                for (let y = 0; y < h; y++) {
+                    for (let x = 0; x < w; x++) {
+                        const n = Math.sin(x * 0.15) * Math.cos(y * 0.15) * 28 + (Math.random() - 0.5) * 45;
+                        const val = Math.max(0, Math.min(255, 195 + n * contrast));
+                        const idx = (y * w + x) * 4;
+                        imgData.data[idx] = val;
+                        imgData.data[idx + 1] = val;
+                        imgData.data[idx + 2] = val;
+                        imgData.data[idx + 3] = 255;
+                    }
+                }
+                ctx.putImageData(imgData, 0, 0);
+                return new THREE.CanvasTexture(canvas);
+            },
+
+            createMasonryTexture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 128;
+                canvas.height = 128;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#e5e0d5';
+                ctx.fillRect(0, 0, 128, 128);
+                ctx.strokeStyle = '#b8b0a0';
+                ctx.lineWidth = 2;
+                for (let row = 0; row < 8; row++) {
+                    const y = row * 16;
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(128, y);
+                    ctx.stroke();
+                    const offset = (row % 2) * 16;
+                    for (let col = 0; col < 5; col++) {
+                        const x = (col * 32 + offset) % 128;
+                        ctx.fillStyle = row % 2 === 0 ? 'rgba(210,202,188,0.35)' : 'rgba(245,242,235,0.35)';
+                        ctx.fillRect(x + 1, y + 1, 30, 14);
+                        ctx.beginPath();
+                        ctx.moveTo(x, y);
+                        ctx.lineTo(x, y + 16);
+                        ctx.stroke();
+                    }
+                }
+                return new THREE.CanvasTexture(canvas);
+            },
+
+            createRoofTileTexture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 128;
+                canvas.height = 128;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#b45309';
+                ctx.fillRect(0, 0, 128, 128);
+                for (let y = 0; y < 128; y += 16) {
+                    ctx.fillStyle = (y / 16) % 2 === 0 ? '#c2410c' : '#9a3412';
+                    ctx.fillRect(0, y, 128, 14);
+                    ctx.strokeStyle = '#7c2d12';
+                    for (let x = 0; x < 128; x += 16) {
+                        ctx.strokeRect(x, y, 16, 15);
+                    }
+                }
+                return new THREE.CanvasTexture(canvas);
+            },
+
+            createWoodTexture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 64;
+                canvas.height = 64;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#78350f';
+                ctx.fillRect(0, 0, 64, 64);
+                ctx.fillStyle = '#5c280b';
+                for (let i = 0; i < 64; i += 8) ctx.fillRect(i, 0, 2, 64);
+                return new THREE.CanvasTexture(canvas);
+            }
+        };
+
+        /**********************************************************************
+         * 4. CORE GAME STATE (Eras, Custom Creature DNA, Slow Clock, Savegame)
+         **********************************************************************/
+        const ERAS_CATALOG = [
+            {
+                era: 1,
+                name: 'Epoche I • Dunkles Nomaden-Zeitalter',
+                shortLabel: 'EPOCHE I • NOMADEN',
+                faithRequired: 0,
+                nextFaith: 100,
+                influenceTarget: 36,
+                desc: 'Deine Siedler errichten die ersten Fachwerkhöfe am Fluss. Manifestiere ihren Glauben!'
+            },
+            {
+                era: 2,
+                name: 'Epoche II • Feudale Stein-Siedlung',
+                shortLabel: 'EPOCHE II • FEUDALZEIT',
+                faithRequired: 100,
+                nextFaith: 250,
+                influenceTarget: 56,
+                desc: 'Steinerne Wehrbauten und Mühlen erheben sich! Dein Einflussbereich dehnt sich über das Tal aus.'
+            },
+            {
+                era: 3,
+                name: 'Epoche III • Blühende Königs-Polis',
+                shortLabel: 'EPOCHE III • KÖNIGSZEIT',
+                faithRequired: 250,
+                nextFaith: 480,
+                influenceTarget: 78,
+                desc: 'Prachtvolle Marmor-Heiligtümer und gepanzerte Hopliten verkünden deine göttliche Herrschaft.'
+            },
+            {
+                era: 4,
+                name: 'Epoche IV • Göttliches Imperium',
+                shortLabel: 'EPOCHE IV • IMPERIUM',
+                faithRequired: 480,
+                nextFaith: 9999,
+                influenceTarget: 108,
+                desc: 'Deine Zivilisation hat das Imperiale Zeitalter erreicht! Goldene Kuppeln überragen die Insel.'
+            }
+        ];
+
+        const GameState = {
+            started: false,
+            mode: 'singleplayer',
+            alignment: 0,
+            era: 1,
+            faith: 15,
+            nextEraFaith: 100,
+            resources: {
+                wood: 110,
+                grain: 110,
+                ore: 65,
+                mana: 90,
+                impressiveness: 40,
+                tribute: 100,
+                pop: 6,
+                maxPop: 12
+            },
+            influenceRadius: 36,
+            interactionMode: 'hand',
+            selectedBuildingType: null,
+            selectedMiracleType: null,
+            handCarryBonus: 1,
+            cameraPanSpeed: 52,
+
+            // Discord State
+            discord: {
+                connected: false,
+                username: 'GodlessRuler#0001',
+                serverInvite: 'discord.gg/godless-pantheon',
+                webhookUrl: '',
+                roomCode: 'GDL-' + Math.floor(1000 + Math.random() * 8999),
+                partyMembers: [
+                    { name: '🟢 Du (Host-Gottheit)', role: 'Imperiale Dynastie', online: true }
+                ]
+            },
+
+            // Slower, Realistic Time & Seasons System (1x is calm and realistic!)
+            time: {
+                speedMultiplier: 1,
+                hour: 9.5,
+                dayCount: 1,
+                year: 1,
+                seasonIndex: 0,
+                seasons: [
+                    { id: 'spring', name: 'Frühling', icon: '🌸', grainMult: 1.15 },
+                    { id: 'summer', name: 'Sommer', icon: '☀️', grainMult: 1.35 },
+                    { id: 'autumn', name: 'Herbst', icon: '🍂', grainMult: 0.95 },
+                    { id: 'winter', name: 'Winter', icon: '❄️', grainMult: 0.65 }
+                ],
+                weather: 'clear',
+                weatherTimer: 90
+            },
+
+            // Interactive Training Tutorial
+            tutorial: {
+                active: false,
+                step: 0,
+                steps: [
+                    {
+                        title: '1. Die Göttliche Perspektive',
+                        desc: 'Bewege deine Sicht mit <b>W, A, S, D</b> über das Flusstal und drehe sie mit <b>Q / E</b> oder dem Mausrad.',
+                        task: 'Bewege deine Kamera über die Insel...'
+                    },
+                    {
+                        title: '2. Menschen greifen & Beruf zuweisen',
+                        desc: 'Klicke mit <b>Linksklick</b> auf einen deiner Dorfbewohner und lege ihn am <b>Heiligtum (Tempel)</b> ab, damit er als Priester betet!',
+                        task: 'Greife einen Menschen und setze ihn am Tempel ab...'
+                    },
+                    {
+                        title: '3. Rohstoffe ernten',
+                        desc: 'Greife einen Baum oder eine Erzader per <b>Linksklick</b> und lege sie am <b>Handels-Speicher</b> ab.',
+                        task: 'Lege einen Baum oder Erzblock am Speicher ab...'
+                    },
+                    {
+                        title: '4. AoE-Architektur errichten',
+                        desc: 'Wähle unten in der Bauleiste ein <b>Hofhaus</b> oder einen <b>Mühlhof</b> und platziere es im Einflussring.',
+                        task: 'Platziere ein neues Gebäude im Einflussbereich...'
+                    },
+                    {
+                        title: '5. Gesten-Wunder wirken',
+                        desc: 'Halte die <b>rechte Maustaste</b> gedrückt und zeichne eine <b>Spirale</b> oder <b>Kreis</b> (oder drücke Taste 1–5).',

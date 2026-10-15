@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="de" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GOD:less — Divine Strategy &amp; Creature Simulation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    
+
+    <link rel="stylesheet" href="/src/styles/main.css">
+</head>
+<body oncontextmenu="return false;">
+
+    <!-- 3D WebGL World, Gesture Rune Canvas & Title Lightning Canvas -->
+    <div id="webgl-container"></div>
+    <canvas id="gesture-canvas"></canvas>
+    <canvas id="lightning-fx-canvas"></canvas>
+
+    <div id="title-screen" class="fixed inset-0 z-40 flex flex-col justify-between p-5 md:p-8 bg-gradient-to-b from-slate-950/85 via-slate-950/55 to-slate-950/95 backdrop-blur-[3px] transition-opacity duration-500">
+        <!-- Top Bar -->
+        <div class="relative z-50 flex flex-wrap items-center justify-between gap-4 max-w-7xl w-full mx-auto">
+            <div class="flex items-center gap-3">
+                <div class="w-11 h-11 rounded-xl bg-amber-500/20 border border-amber-400/50 flex items-center justify-center text-amber-300 shadow-lg">
+                    <i class="fa-solid fa-hand-sparkles text-xl"></i>
+                </div>
+                <div>
+                    <div class="text-[11px] uppercase tracking-[0.28em] text-amber-300/90 font-semibold">Black &amp; White II • Age of Empires IV Engine</div>
+                    <div class="text-sm text-slate-300 font-medium">Wähle deinen Titanen-Slot &amp; entfessle deine göttliche Macht</div>
+                </div>
+            </div>
+
+            <!-- 5 Creature Slots Bar in Title Screen -->
+            <div class="flex flex-wrap items-center gap-2 aoe-panel px-3 py-2 rounded-2xl">
+                <span class="text-[11px] uppercase tracking-wider text-amber-200 font-semibold mr-1">Titanen-Slots:</span>
+                <div id="title-slot-buttons" class="flex items-center gap-1.5"></div>
+                <button onclick="window.openCreatureDesigner()" class="ml-2 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 font-bold text-xs hover:brightness-110 transition shadow">
+                    <i class="fa-solid fa-dna mr-1"></i>Kreatur-Designer (5 Slots)
+                </button>
+                <button id="btn-continue-saved" onclick="window.loadSavedWorld()" class="hidden px-3 py-1.5 rounded-xl bg-emerald-500/20 border border-emerald-400/50 text-emerald-200 font-bold text-xs hover:bg-emerald-500/30 transition items-center gap-1.5">
+                    <i class="fa-solid fa-floppy-disk"></i>Spielstand laden
+                </button>
+            </div>
+        </div>
+
+        <!-- Center Title & 3D Parallax Scroller -->
+        <div class="relative z-50 my-auto max-w-7xl w-full mx-auto flex flex-col items-center text-center">
+            <div class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-amber-500/15 border border-amber-400/40 text-amber-300 text-xs font-semibold tracking-widest uppercase mb-3">
+                <i class="fa-solid fa-bolt"></i> Göttliche Echtzeit-Strategie &amp; Chimären-Simulation
+            </div>
+            <h1 class="font-cinzel text-5xl sm:text-7xl md:text-8xl font-black tracking-[0.14em] text-transparent bg-clip-text bg-gradient-to-b from-amber-100 via-amber-300 to-amber-600 godless-title-glow">
+                GOD:less
+            </h1>
+            <p class="mt-2 max-w-2xl text-xs sm:text-sm text-slate-300/95 leading-relaxed">
+                Führe deine Zivilisation vom Nomaden-Ursprung zum göttlichen Imperium. Forme deine Chimären-Kreatur aus 14 Wesen und 13 Beschaffenheiten, errichte klassische Städte und wirke Wunder mit deiner schwebenden Wolkenhand.
+            </p>
+
+            <!-- Scroller Navigation Arrows + 3D Cards -->
+            <div class="relative w-full mt-6 flex items-center">
+                <button onclick="window.scrollModeCards(-1)" class="hidden md:flex w-10 h-10 rounded-full aoe-panel items-center justify-center text-amber-300 hover:bg-amber-500/20 transition shrink-0 mr-3">
+                    <i class="fa-solid fa-chevron-left"></i>
+                </button>
+
+                <div id="godless-scroller" class="flex gap-5 overflow-x-auto no-scrollbar py-4 px-2 w-full justify-start lg:justify-center">
+                    <!-- Card 1: Singleplayer -->
+                    <div onmousemove="window.tiltCard3D(event, this)" onmouseleave="window.resetCard3D(this)" onclick="window.startGameMode('singleplayer')" class="godless-card aoe-panel rounded-3xl p-5 w-72 shrink-0 text-left cursor-pointer flex flex-col justify-between border border-amber-400/40">
+                        <div>
+                            <div class="flex items-center justify-between mb-3">
+                                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-400/40">Epoche I–IV Kampagne</span>
+                                <i class="fa-solid fa-crown text-amber-400 text-lg"></i>
+                            </div>
+                            <h3 class="font-cinzel text-xl font-bold text-amber-100 mb-1">Singleplayer</h3>
+                            <p class="text-xs text-slate-300 leading-relaxed">
+                                Starte im Ursprung der Zivilisation. Manifestiere den Glauben deiner Siedler, errichte deine klassische Polis und beeindrucke Wikinger, Japaner und Azteken.
+                            </p>
+                        </div>
+                        <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-bold text-amber-300">
+                            <span>Neue Welt erschaffen</span>
+                            <i class="fa-solid fa-arrow-right"></i>
+                        </div>
+                    </div>
+
+                    <!-- Card 2: Multiplayer & Discord Pantheon -->
+                    <div onmousemove="window.tiltCard3D(event, this)" onmouseleave="window.resetCard3D(this)" onclick="window.openDiscordModal()" class="godless-card aoe-panel rounded-3xl p-5 w-72 shrink-0 text-left cursor-pointer flex flex-col justify-between border border-indigo-400/40">
+                        <div>
+                            <div class="flex items-center justify-between mb-3">
+                                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-400/40">Discord-Koop</span>
+                                <i class="fa-brands fa-discord text-indigo-400 text-lg"></i>
+                            </div>
+                            <h3 class="font-cinzel text-xl font-bold text-indigo-100 mb-1">Multiplayer</h3>
+                            <p class="text-xs text-slate-300 leading-relaxed">
+                                Verbinde deinen Discord-Server, teile deinen Pantheon-Raumcode oder sende Live-Chronik-Pings direkt in deinen Channel.
+                            </p>
+                        </div>
+                        <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-bold text-indigo-300">
+                            <span>Discord-Lobby öffnen</span>
+                            <i class="fa-solid fa-arrow-right"></i>
+                        </div>
+                    </div>
+
+                    <!-- Card 3: Interactive Training / Tutorial -->
+                    <div onmousemove="window.tiltCard3D(event, this)" onmouseleave="window.resetCard3D(this)" onclick="window.startGameMode('tutorial')" class="godless-card aoe-panel rounded-3xl p-5 w-72 shrink-0 text-left cursor-pointer flex flex-col justify-between border border-sky-400/40">
+                        <div>
+                            <div class="flex items-center justify-between mb-3">
+                                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-sky-500/20 text-sky-300 border border-sky-400/40">Interaktive Lehre</span>
+                                <i class="fa-solid fa-graduation-cap text-sky-400 text-lg"></i>
+                            </div>
+                            <h3 class="font-cinzel text-xl font-bold text-sky-100 mb-1">Training &amp; Lehre</h3>
+                            <p class="text-xs text-slate-300 leading-relaxed">
+                                Lerne Schritt für Schritt die Führung der Wolkenhand Gottes, das Zeichnen von Wunder-Runen, den Städtebau und die Erziehung deiner Kreatur.
+                            </p>
+                        </div>
+                        <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-bold text-sky-300">
+                            <span>Trainings-Session starten</span>
+                            <i class="fa-solid fa-arrow-right"></i>
+                        </div>
+                    </div>
+
+                    <!-- Card 4: Settings -->
+                    <div onmousemove="window.tiltCard3D(event, this)" onmouseleave="window.resetCard3D(this)" onclick="window.openSettingsModal()" class="godless-card aoe-panel rounded-3xl p-5 w-72 shrink-0 text-left cursor-pointer flex flex-col justify-between border border-emerald-400/40">
+                        <div>
+                            <div class="flex items-center justify-between mb-3">
+                                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-400/40">Grafik &amp; Kosmos</span>
+                                <i class="fa-solid fa-sliders text-emerald-400 text-lg"></i>
+                            </div>
+                            <h3 class="font-cinzel text-xl font-bold text-emerald-100 mb-1">Settings</h3>
+                            <p class="text-xs text-slate-300 leading-relaxed">
+                                Passe 3D-Supersampling, Blitz-Intensität des Mauszeigers und Grafikdetails an dein System an.
+                            </p>
+                        </div>
+                        <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-bold text-emerald-300">
+                            <span>Einstellungen öffnen</span>
+                            <i class="fa-solid fa-gear"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <button onclick="window.scrollModeCards(1)" class="hidden md:flex w-10 h-10 rounded-full aoe-panel items-center justify-center text-amber-300 hover:bg-amber-500/20 transition shrink-0 ml-3">
+                    <i class="fa-solid fa-chevron-right"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Bottom Controls Hint -->
+        <div class="relative z-50 max-w-7xl w-full mx-auto flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400 border-t border-slate-800/80 pt-3">
+            <div><strong class="text-amber-300">Steuerung im Spiel:</strong> <kbd class="px-1.5 py-0.5 bg-slate-800 rounded">WASD</kbd> / <kbd class="px-1.5 py-0.5 bg-slate-800 rounded">Pfeiltasten</kbd> Kamera • <kbd class="px-1.5 py-0.5 bg-slate-800 rounded">Q/E</kbd> Drehen • <kbd class="px-1.5 py-0.5 bg-slate-800 rounded">Mausrad</kbd> Zoom</div>
+            <div><strong class="text-sky-300">Wolkenhand Gottes:</strong> <kbd class="px-1.5 py-0.5 bg-slate-800 rounded">Linksklick</kbd> Greifen / Bauen / Aufheben • <kbd class="px-1.5 py-0.5 bg-slate-800 rounded">Rechtsklick halten</kbd> Wunder-Rune zeichnen</div>
+        </div>
+    </div>
+
+    <div id="creature-designer-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-3 sm:p-5 bg-slate-950/85 backdrop-blur-md overflow-y-auto">
+        <div class="aoe-panel rounded-3xl max-w-4xl w-full p-5 sm:p-6 border border-amber-400/50 shadow-2xl my-auto max-h-[94vh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-400/50 flex items-center justify-center text-amber-300 text-lg">
+                        <i class="fa-solid fa-dna"></i>
+                    </div>
+                    <div>
+                        <h2 class="font-cinzel text-xl sm:text-2xl font-bold text-amber-200">5-Slot Chimären-KreaturenDesigner</h2>
+                        <p class="text-xs text-slate-400">Kombiniere Kopf, Oberkörper &amp; Unterkörper aus 14 Wesen, 13 Beschaffenheiten und definiere die KI-Persönlichkeit</p>
+                    </div>
+                </div>
+                <button onclick="window.closeCreatureDesigner()" class="w-9 h-9 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 font-bold">✕</button>
+            </div>
+
+            <!-- 5 Slot Tabs -->
+            <div id="designer-slot-tabs" class="grid grid-cols-5 gap-2 mb-4"></div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 text-xs">
+                <!-- Left Column: Thumbnail Logo, Name, Size & Muscle -->
+                <div class="lg:col-span-4 flex flex-col gap-3 bg-slate-900/75 p-4 rounded-2xl border border-slate-800">
+                    <div class="flex flex-col items-center">
+                        <span class="text-[11px] uppercase tracking-wider text-amber-300 font-bold mb-1.5">Logo (Thumbnail-Vorschau)</span>
+                        <div class="relative p-1.5 rounded-2xl bg-slate-950 border-2 border-amber-400/60 shadow-inner">
+                            <canvas id="cd-logo-canvas" width="144" height="144" class="w-32 h-32 rounded-xl"></canvas>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-slate-300 font-semibold mb-1">Name (Im Spiel angezeigt)</label>
+                        <input id="cd-name" type="text" oninput="window.updateDesignerLogoPreview()" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-amber-100 font-semibold" />
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-slate-300 font-semibold mb-1">
+                            <span>Größe (Körpergröße)</span>
+                            <span id="cd-scale-val" class="text-amber-300 font-bold">1.15x</span>
+                        </div>
+                        <input id="cd-scale" type="range" min="0.80" max="1.65" step="0.05" class="w-full accent-amber-400" oninput="document.getElementById('cd-scale-val').textContent=this.value+'x'; window.updateDesignerLogoPreview();" />
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-slate-300 font-semibold mb-1">
+                            <span>Muskel (Statur)</span>
+                            <span id="cd-muscle-val" class="text-amber-300 font-bold">1.20x</span>
+                        </div>
+                        <input id="cd-muscle" type="range" min="0.80" max="1.60" step="0.05" class="w-full accent-amber-400" oninput="document.getElementById('cd-muscle-val').textContent=this.value+'x'; window.updateDesignerLogoPreview();" />
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 pt-1">
+                        <div>
+                            <label class="block text-slate-300 font-semibold mb-1">Augenleuchten</label>
+                            <input id="cd-eye" type="color" oninput="window.updateDesignerLogoPreview()" class="w-full h-8 rounded-lg bg-slate-950 border border-slate-700 cursor-pointer" />
+                        </div>
+                        <div>
+                            <label class="block text-slate-300 font-semibold mb-1">Rüstung</label>
+                            <select id="cd-armor" onchange="window.updateDesignerLogoPreview()" class="w-full h-8 px-2 rounded-lg bg-slate-950 border border-slate-700 text-slate-200">
+                                <option value="none">Keine</option>
+                                <option value="gold">Goldpanzer</option>
+                                <option value="obsidian">Obsidian</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Middle Column: Modular Body Parts (Kopf, Oberkörper, Unterkörper) -->
+                <div class="lg:col-span-4 flex flex-col justify-between gap-3 bg-slate-900/75 p-4 rounded-2xl border border-slate-800">
+                    <div class="text-amber-300 font-bold uppercase tracking-wider text-[11px] border-b border-slate-800 pb-1.5">
+                        <i class="fa-solid fa-puzzle-piece mr-1"></i>Körperteile &amp; Beschaffenheit
+                    </div>
+
+                    <!-- 1. Kopf -->
+                    <div class="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800/90 space-y-2">
+                        <div class="font-bold text-amber-200 flex items-center justify-between">
+                            <span>1. Kopf</span>
+                            <span class="text-[10px] text-slate-400">Schädel, Hörner, Rüssel, Schnabel</span>
+                        </div>
+                        <div class="grid grid-cols-1 gap-1.5">
+                            <div>
+                                <label class="text-[10px] text-slate-400 block mb-0.5">Wesenauswahl (Kopf)</label>
+                                <select id="cd-head-species" onchange="window.updateDesignerLogoPreview()" class="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-amber-100 font-medium"></select>
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-slate-400 block mb-0.5">Beschaffenheit (Kopf)</label>
+                                <select id="cd-head-surface" onchange="window.updateDesignerLogoPreview()" class="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-200"></select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 2. Oberkörper -->
+                    <div class="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800/90 space-y-2">
+                        <div class="font-bold text-amber-200 flex items-center justify-between">
+                            <span>2. Oberkörper</span>
+                            <span class="text-[10px] text-slate-400">Torso, Mähne, Schwingen, Arme</span>
+                        </div>
+                        <div class="grid grid-cols-1 gap-1.5">
+                            <div>
+                                <label class="text-[10px] text-slate-400 block mb-0.5">Wesenauswahl (Oberkörper)</label>
+                                <select id="cd-upper-species" onchange="window.updateDesignerLogoPreview()" class="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-amber-100 font-medium"></select>
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-slate-400 block mb-0.5">Beschaffenheit (Oberkörper)</label>
+                                <select id="cd-upper-surface" onchange="window.updateDesignerLogoPreview()" class="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-200"></select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3. Unterkörper -->
+                    <div class="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800/90 space-y-2">
+                        <div class="font-bold text-amber-200 flex items-center justify-between">
+                            <span>3. Unterkörper</span>
+                            <span class="text-[10px] text-slate-400">Beine, Hufe, Krallen, Schweif/Stachel</span>
+                        </div>
+                        <div class="grid grid-cols-1 gap-1.5">
+                            <div>
+                                <label class="text-[10px] text-slate-400 block mb-0.5">Wesenauswahl (Unterkörper)</label>
+                                <select id="cd-lower-species" onchange="window.updateDesignerLogoPreview()" class="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-amber-100 font-medium"></select>
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-slate-400 block mb-0.5">Beschaffenheit (Unterkörper)</label>
+                                <select id="cd-lower-surface" onchange="window.updateDesignerLogoPreview()" class="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-200"></select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column: Character & AI Behavior Attributes -->
+                <div class="lg:col-span-4 flex flex-col justify-between gap-3 bg-slate-900/75 p-4 rounded-2xl border border-slate-800">
+                    <div class="text-amber-300 font-bold uppercase tracking-wider text-[11px] border-b border-slate-800 pb-1.5">
+                        <i class="fa-solid fa-brain mr-1"></i>Wesen &amp; Verhaltens-Parameter
+                    </div>
+
+                    <div class="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800/90">
+                        <div class="flex justify-between font-bold text-emerald-300 mb-0.5">
+                            <span>🤝 Sozialverhalten</span>
+                            <span id="cd-social-val">75%</span>
+                        </div>
+                        <p class="text-[10px] text-slate-400 mb-1.5">Fähigkeit mit Menschen zusammenzuleben (+Glaube &amp; Harmonie in der Stadt)</p>
+                        <input id="cd-social" type="range" min="0" max="100" step="5" class="w-full accent-emerald-400" oninput="document.getElementById('cd-social-val').textContent=this.value+'%'; window.updateDesignerLogoPreview();" />
+                    </div>
+
+                    <div class="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800/90">
+                        <div class="flex justify-between font-bold text-rose-300 mb-0.5">
+                            <span>⚔️ Aggressivität</span>
+                            <span id="cd-aggr-val">35%</span>
+                        </div>
+                        <p class="text-[10px] text-slate-400 mb-1.5">Verhaltensweise gegenüber Rivalen &amp; Kampfbereitschaft</p>
+                        <input id="cd-aggr" type="range" min="0" max="100" step="5" class="w-full accent-rose-400" oninput="document.getElementById('cd-aggr-val').textContent=this.value+'%'; window.updateDesignerLogoPreview();" />
+                    </div>
+
+                    <div class="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800/90">
+                        <div class="flex justify-between font-bold text-sky-300 mb-0.5">
+                            <span>🔨 Produktivität</span>
+                            <span id="cd-prod-val">80%</span>
+                        </div>
+                        <p class="text-[10px] text-slate-400 mb-1.5">Verlässlichkeit und Eigeninitiative beim Bauen &amp; Rohstoffsammeln</p>
+                        <input id="cd-prod" type="range" min="0" max="100" step="5" class="w-full accent-sky-400" oninput="document.getElementById('cd-prod-val').textContent=this.value+'%'; window.updateDesignerLogoPreview();" />
+                    </div>
+
+                    <div class="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800/90">
+                        <div class="flex justify-between font-bold text-amber-300 mb-0.5">
+                            <span>❤️‍🔥 Vitalität</span>
+                            <span id="cd-vit-val">85%</span>
+                        </div>
+                        <p class="text-[10px] text-slate-400 mb-1.5">Definition wie viel Ruhepausen die Kreatur benötigt (Ausdauer)</p>
+                        <input id="cd-vit" type="range" min="10" max="100" step="5" class="w-full accent-amber-400" oninput="document.getElementById('cd-vit-val').textContent=this.value+'%'; window.updateDesignerLogoPreview();" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-2 mt-5 pt-4 border-t border-slate-800">
+                <button onclick="window.resetCreatureSlotsDefault()" class="px-3.5 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-slate-700">
+                    Standard wiederherstellen
+                </button>
+                <div class="flex gap-2">
+                    <button onclick="window.closeCreatureDesigner()" class="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-slate-700">
+                        Schließen
+                    </button>
+                    <button onclick="window.saveCurrentCreatureSlot()" class="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 font-bold text-xs hover:brightness-110 shadow-lg">
+                        <i class="fa-solid fa-check mr-1"></i>Slot speichern &amp; 3D-Chimäre aktualisieren
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="discord-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+        <div class="aoe-panel rounded-3xl max-w-lg w-full p-6 border border-indigo-400/50 shadow-2xl">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+                <div class="flex items-center gap-2.5">
+                    <i class="fa-brands fa-discord text-2xl text-indigo-400"></i>
+                    <div>
+                        <h2 class="font-cinzel text-xl font-bold text-indigo-100">Discord-Pantheon &amp; Koop-Lobby</h2>
+                        <p class="text-xs text-slate-400">Verbinde deinen Discord-Server &amp; spiele mit Freunden</p>
+                    </div>
+                </div>
+                <button onclick="window.closeDiscordModal()" class="w-8 h-8 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700">✕</button>
+            </div>
+
+            <div class="space-y-3 text-xs">
+                <div class="p-3 rounded-2xl bg-indigo-950/40 border border-indigo-500/30 flex items-center justify-between">
+                    <div>
+                        <div class="text-slate-400">Dein Pantheon-Raumcode:</div>
+                        <div id="discord-room-code" class="font-mono text-base font-bold text-amber-300">OLYMP-7742</div>
+                    </div>
+                    <button onclick="window.copyRoomCode()" class="px-3 py-1.5 rounded-xl bg-indigo-500/30 border border-indigo-400/40 text-indigo-200 font-semibold hover:bg-indigo-500/40">
+                        <i class="fa-solid fa-copy mr-1"></i>Code kopieren
+                    </button>
+                </div>
+
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1">Discord Server-Invite oder Channel-Link</label>
+                    <input id="discord-invite-input" type="text" placeholder="https://discord.gg/dein-server" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-200" />
+                </div>
+
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1">Discord Webhook-URL (Optional für Live-Chronik-Pings)</label>
+                    <input id="discord-webhook-input" type="text" placeholder="https://discord.com/api/webhooks/..." class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-200" />
+                </div>
+
+                <div id="discord-status-msg" class="text-emerald-300 font-medium min-h-[18px]"></div>
+            </div>
+
+            <div class="flex items-center justify-end gap-2 mt-5 pt-3 border-t border-slate-800">
+                <button onclick="window.sendDiscordWebhookPing()" class="px-4 py-2 rounded-xl bg-indigo-600/30 border border-indigo-400/50 text-indigo-200 text-xs font-bold hover:bg-indigo-600/40">
+                    <i class="fa-solid fa-paper-plane mr-1"></i>Test-Ping senden
+                </button>
+                <button onclick="window.closeDiscordModal(); window.startGameMode('multiplayer');" class="px-5 py-2 rounded-xl bg-gradient-to-r from-indigo-500 to-sky-500 text-white text-xs font-bold hover:brightness-110 shadow-lg">
+                    Multiplayer-Welt starten
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="settings-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+        <div class="aoe-panel rounded-3xl max-w-md w-full p-6 border border-emerald-400/40 shadow-2xl">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+                <h2 class="font-cinzel text-xl font-bold text-emerald-200">⚙️ Göttliche Einstellungen</h2>
+                <button onclick="window.closeSettingsModal()" class="w-8 h-8 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700">✕</button>
+            </div>
+            <div class="space-y-4 text-xs">
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1">Maus-Blitz-Intensität im Titelbildschirm</label>
+                    <input type="range" min="0" max="2" step="0.2" value="1.2" class="w-full accent-amber-400" oninput="window.setLightningIntensity(this.value)" />
+                </div>
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1">3D-Render-Qualität (Pixel Ratio)</label>
+                    <select onchange="window.setRenderQuality(this.value)" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-200">
+                        <option value="1">Standard (60 FPS Fokus)</option>
+                        <option value="1.5">Hoch (1.5x Supersampling)</option>
+                        <option value="2" selected>Ultra (2.0x Retina / High-Res)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="flex justify-end mt-6 pt-3 border-t border-slate-800">
+                <button onclick="window.closeSettingsModal()" class="px-5 py-2 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs">Fertig</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="game-hud" class="fixed inset-0 z-20 pointer-events-none hidden flex-col justify-between p-3 sm:p-4">
+        <!-- Top Row: Faith & Epoch, World Clock & Speed, Resources & Save/Menu -->
+        <div class="flex flex-wrap items-start justify-between gap-2 w-full">
+            <!-- Left: Epoch, Faith & Alignment -->
+            <div class="pointer-events-auto aoe-panel rounded-2xl px-3.5 py-2 flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-400/50 flex flex-col items-center justify-center text-amber-300">
+                    <span class="text-[9px] uppercase tracking-tighter">Epoche</span>
+                    <span id="hud-epoch-roman" class="font-cinzel font-black text-base leading-none">I</span>
+                </div>
+                <div class="text-xs">
+                    <div class="flex items-center gap-2">
+                        <span id="hud-epoch-name" class="font-bold text-amber-100">Ursprung (Nomaden)</span>
+                        <span class="text-amber-300 font-semibold">🙏 <span id="hud-faith-val">15</span>/<span id="hud-faith-max">100</span></span>
+                    </div>
+                    <div class="w-36 h-1.5 bg-slate-800 rounded-full overflow-hidden mt-1">
+                        <div id="hud-faith-bar" class="h-full bg-gradient-to-r from-amber-500 to-yellow-300 transition-all duration-300" style="width: 15%;"></div>
+                    </div>
+                    <div class="flex items-center justify-between text-[10px] text-slate-400 mt-1">
+                        <span>Gesinnung: <strong id="hud-align-label" class="text-slate-200">Neutral (0)</strong></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Center: Realistic Slow World Clock, Season & Speed Controls -->
+            <div class="pointer-events-auto aoe-panel rounded-2xl px-3.5 py-2 flex items-center gap-3">
+                <div class="text-xs">
+                    <div class="flex items-center gap-2 font-bold text-amber-200">
+                        <span id="hud-season-icon">🌱</span>
+                        <span id="hud-season-name">Frühling</span>
+                        <span class="text-slate-400">•</span>
+                        <span id="hud-time-clock">Tag 1, 10:12</span>
+                    </div>
+                    <div class="flex items-center gap-2 text-[10px] text-slate-300 mt-0.5">
+                        <span id="hud-hand-context">☁️🖐️ Göttliche Wolkenhand bereit (Bewege Maus über Siedler, Bäume oder Baustellen)</span>
+                    </div>
+                </div>
+                <div class="flex items-center gap-1 border-l border-slate-700 pl-2">
+                    <button onclick="window.setTimeScale(0)" id="speed-0" title="Pause" class="px-2 py-1 rounded text-[10px] font-bold bg-slate-800 text-slate-300 hover:bg-slate-700">⏸</button>
+                    <button onclick="window.setTimeScale(1)" id="speed-1" title="Normal (Realistisch langsam)" class="px-2 py-1 rounded text-[10px] font-bold bg-amber-500 text-slate-950">1x</button>
+                    <button onclick="window.setTimeScale(2)" id="speed-2" title="Doppelt" class="px-2 py-1 rounded text-[10px] font-bold bg-slate-800 text-slate-300 hover:bg-slate-700">2x</button>
+                    <button onclick="window.setTimeScale(4)" id="speed-4" title="Schnellvorlauf" class="px-2 py-1 rounded text-[10px] font-bold bg-slate-800 text-slate-300 hover:bg-slate-700">4x</button>
+                </div>
+            </div>
+
+            <!-- Right: Resources & Save / Menu -->
+            <div class="pointer-events-auto aoe-panel rounded-2xl px-3.5 py-2 flex flex-wrap items-center gap-3 text-xs">
+                <div title="Nahrung (Getreide)"><span class="text-amber-400">🌾</span> <strong id="res-food">160</strong></div>
+                <div title="Holz"><span class="text-emerald-400">🌲</span> <strong id="res-wood">160</strong></div>
+                <div title="Erz"><span class="text-slate-300">⛏️</span> <strong id="res-ore">90</strong></div>
+                <div title="Göttliches Mana"><span class="text-sky-400">✨</span> <strong id="res-mana">280</strong></div>
+                <div title="Bevölkerung"><span class="text-rose-300">👥</span> <strong id="res-pop">7/16</strong></div>
+                <div class="flex items-center gap-1.5 border-l border-slate-700 pl-2">
+                    <button onclick="window.saveWorldState()" class="px-2.5 py-1 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 font-semibold hover:bg-emerald-500/30">
+                        <i class="fa-solid fa-floppy-disk mr-1"></i>Speichern
+                    </button>
+                    <button onclick="window.returnToTitleScreen()" class="px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 font-semibold hover:bg-slate-700">
+                        <i class="fa-solid fa-house mr-1"></i>Menü
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Middle Left: Creature Titan Control & Rival Tribes -->
+        <div class="flex items-start justify-between my-auto w-full pointer-events-none">
+            <div class="pointer-events-auto aoe-panel rounded-2xl p-3 w-64 space-y-2.5 text-xs">
+                <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-2 min-w-0">
+                        <img id="hud-creature-logo" alt="Logo" class="w-9 h-9 rounded-lg border border-amber-400/50 bg-slate-950 shrink-0 object-cover" />
+                        <div class="truncate">
+                            <div class="font-cinzel font-bold text-amber-200 truncate" id="hud-creature-name">Aurion</div>
+                            <div class="text-[10px] text-slate-400 truncate" id="hud-creature-sub">🦁🦁🦁 • ⚡100%</div>
+                        </div>
+                    </div>
+                    <button onclick="window.openCreatureDesigner()" class="text-[10px] px-2 py-1 rounded bg-amber-500/20 text-amber-300 border border-amber-400/30 hover:bg-amber-500/30 shrink-0">
+                        Designer
+                    </button>
+                </div>
+                <div id="hud-slot-switcher" class="grid grid-cols-5 gap-1"></div>
+                <div class="text-[11px] text-sky-300 truncate" id="hud-creature-state">Denkt nach &amp; wacht über die Polis</div>
+
+                <!-- 5 Creature Roles -->
+                <div class="grid grid-cols-5 gap-1 pt-1">
+                    <button onclick="window.setCreatureRole('free')" id="crole-free" class="px-1.5 py-1 rounded bg-amber-500 text-slate-950 font-bold text-[10px]" title="Freier Wille">Frei</button>
+                    <button onclick="window.setCreatureRole('gather')" id="crole-gather" class="px-1.5 py-1 rounded bg-slate-800 text-slate-300 font-semibold text-[10px]" title="Sammler">Sammeln</button>
+                    <button onclick="window.setCreatureRole('builder')" id="crole-builder" class="px-1.5 py-1 rounded bg-slate-800 text-slate-300 font-semibold text-[10px]" title="Baumeister">Bauen</button>
+                    <button onclick="window.setCreatureRole('entertain')" id="crole-entertain" class="px-1.5 py-1 rounded bg-slate-800 text-slate-300 font-semibold text-[10px]" title="Alleinunterhalter">Jubel</button>
+                    <button onclick="window.setCreatureRole('soldier')" id="crole-soldier" class="px-1.5 py-1 rounded bg-slate-800 text-slate-300 font-semibold text-[10px]" title="Soldat">Krieg</button>
+                </div>
+
+                <!-- Praise / Slap -->
+                <div class="grid grid-cols-2 gap-1.5 pt-1">
+                    <button onclick="window.praiseCreature()" class="py-1.5 rounded-xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 font-semibold hover:bg-emerald-500/30">
+                        🙌 Loben (+Gut)
+                    </button>
+                    <button onclick="window.punishCreature()" class="py-1.5 rounded-xl bg-rose-500/20 border border-rose-400/40 text-rose-200 font-semibold hover:bg-rose-500/30">
+                        ⚡ Strafen (+Böse)
+                    </button>
+                </div>
+
+                <!-- Rival Tribes Impression -->
+                <div class="border-t border-slate-800 pt-2 space-y-1 text-[10px]">
+                    <div class="flex justify-between"><span>🛡️ Wikinger (Norden)</span><span id="tribe-vikings-val" class="text-amber-300 font-bold">35%</span></div>
+                    <div class="flex justify-between"><span>⛩️ Japaner (Osten)</span><span id="tribe-japanese-val" class="text-amber-300 font-bold">20%</span></div>
+                    <div class="flex justify-between"><span>🔥 Azteken (Süden)</span><span id="tribe-aztecs-val" class="text-amber-300 font-bold">5%</span></div>
+                </div>
+            </div>
+
+            <!-- Interactive Tutorial Banner & Toast Feed -->
+            <div class="flex flex-col items-end gap-2 max-w-sm">
+                <div id="tutorial-banner" class="hidden pointer-events-auto aoe-panel rounded-2xl p-3.5 border border-sky-400/60 text-xs space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="font-cinzel font-bold text-sky-300">🎓 Trainings-Lehre</span>
+                        <button onclick="window.nextTutorialStep()" class="px-2 py-0.5 rounded bg-sky-500/30 text-sky-200 text-[10px] font-bold">Weiter →</button>
+                    </div>
+                    <div id="tutorial-text" class="text-slate-200 leading-relaxed"></div>
+                </div>
+                <div id="divine-toast" class="pointer-events-none aoe-panel rounded-2xl px-4 py-2 text-xs font-semibold text-amber-200 opacity-0 transition-opacity duration-300"></div>
+            </div>
+        </div>
+
+        <!-- Bottom Bar: AoE4 / B&W2 Building Construction & Miracle Gestures -->
+        <div class="flex flex-wrap items-end justify-between gap-2 w-full">
+            <!-- Construction Menu -->
+            <div class="pointer-events-auto aoe-panel rounded-2xl p-2 flex flex-wrap items-center gap-1.5">
+                <button onclick="window.selectBuildMode('house')" id="build-house" class="px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-xs flex items-center gap-2">
+                    <span>🏛️</span>
+                    <div class="text-left"><div class="font-bold text-amber-100">Klassische Villa</div><div class="text-[10px] text-slate-400">30 Holz • +4 Wohnraum</div></div>
+                </button>
+                <button onclick="window.selectBuildMode('mill')" id="build-mill" class="px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-xs flex items-center gap-2">
+                    <span>🌾</span>
+                    <div class="text-left"><div class="font-bold text-amber-100">Windmühle &amp; Felder</div><div class="text-[10px] text-slate-400">40 Holz • +Nahrung</div></div>
+                </button>
+                <button onclick="window.selectBuildMode('warehouse')" id="build-warehouse" class="px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-xs flex items-center gap-2">
+                    <span>📦</span>
+                    <div class="text-left"><div class="font-bold text-amber-100">Lagerhaus</div><div class="text-[10px] text-slate-400">35 Holz • Rohstoff-Depot</div></div>
+                </button>
+                <button onclick="window.selectBuildMode('barracks')" id="build-barracks" class="px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-xs flex items-center gap-2">
+                    <span>⚔️</span>
+                    <div class="text-left"><div class="font-bold text-amber-100">Festungs-Kaserne</div><div class="text-[10px] text-slate-400">45 Holz, 25 Erz</div></div>
+                </button>
+                <button onclick="window.selectBuildMode('shrine')" id="build-shrine" class="px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-xs flex items-center gap-2">
+                    <span>⛩️</span>
+                    <div class="text-left"><div class="font-bold text-amber-100">Kuppelschrein</div><div class="text-[10px] text-slate-400">35 Holz, 20 Erz • +Glaube</div></div>
+                </button>
+            </div>
+
+            <!-- Miracle Bar (Right-Click Gesture or Quick Click) -->
+            <div class="pointer-events-auto aoe-panel rounded-2xl p-2 flex flex-wrap items-center gap-1.5">
+                <span class="text-[10px] uppercase tracking-wider text-sky-300 font-bold px-1.5">Wunder (Rechtsklick-Rune):</span>
+                <button onclick="window.castMiracleAtCursor('water')" class="px-2.5 py-1.5 rounded-xl bg-sky-500/20 border border-sky-400/40 text-sky-200 text-xs font-semibold hover:bg-sky-500/30" title="Rune: Spirale / Kreis">
+                    🌧️ Segensregen (25✨)
+                </button>
+                <button onclick="window.castMiracleAtCursor('heal')" class="px-2.5 py-1.5 rounded-xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 text-xs font-semibold hover:bg-emerald-500/30" title="Rune: Kreuz / Herz">
+                    💚 Heilung &amp; Reparatur (35✨)
+                </button>
+                <button onclick="window.castMiracleAtCursor('fireball')" class="px-2.5 py-1.5 rounded-xl bg-orange-500/20 border border-orange-400/40 text-orange-200 text-xs font-semibold hover:bg-orange-500/30" title="Rune: Kreis">
+                    🔥 Feuerball (45✨)
+                </button>
+                <button onclick="window.castMiracleAtCursor('lightning')" class="px-2.5 py-1.5 rounded-xl bg-yellow-500/20 border border-yellow-400/40 text-yellow-200 text-xs font-semibold hover:bg-yellow-500/30" title="Rune: Zick-Zack">
+                    ⚡ Blitzschlag (55✨)
+                </button>
+                <button onclick="window.castMiracleAtCursor('volcano')" class="px-2.5 py-1.5 rounded-xl bg-rose-500/20 border border-rose-400/40 text-rose-200 text-xs font-semibold hover:bg-rose-500/30" title="Rune: Dreieck △">
+                    🌋 Epischer Vulkan (110✨)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+</body>
+</html>

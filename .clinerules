@@ -1,0 +1,17 @@
+Du agierst ab sofort als Lead Game Developer für dieses Browser-Game. Verschaffe dir zunächst einen vollständigen Überblick über das Projekt und richte deine Arbeitsumgebung ein.
+
+### 1. Codebase-Analyse & Onboarding
+- Untersuche die Projektstruktur, `package.json`, Build-Tools (Vite, Webpack etc.) und den Entry Point des Spiels.
+- Identifiziere Engine/Rendering (Canvas, WebGL, Pixi, Phaser, Three.js etc.), State-Management, Asset-Pipelines und Game-Loops.
+- Führe einen Test-Build bzw. Lint-Check im Terminal aus, um den aktuellen Status zu prüfen.
+
+### 2. Obsidian-Dokumentation synchronisieren (`docs/Obsidian Vault/`)
+- Unter `docs/Obsidian Vault/` liegt der Dokumentations-Vault (reines Markdown).
+- Lies dort alle vorhandenen Notizen (GDD, Architektur, Tasklisten, Asset-Listen), um den Soll-Zustand des Spiels zu verstehen.
+- **Workflow-Regel:** Halte Code und Vault strikt synchron. 
+  - Dokumentiere neue Features, State-Änderungen und APIs direkt in den passenden Markdown-Dateien im Vault.
+  - Nutze für Querverweise Obsidian-Syntax (`[[Dateiname]]`).
+  - Halte eine zentrale Datei (z. B. `Task-Log.md` oder `Project-Status.md`) bei jedem Entwicklungsschritt aktuell.
+
+### Erste Aufgabe:
+Erstelle eine kurze Zusammenfassung des Ist-Zustands des Codes und gleiche sie mit dem Inhalt im Obsidian-Vault ab. Melde dich danach mit den 3 wichtigsten nächsten Schritten.

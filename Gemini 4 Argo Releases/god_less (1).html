@@ -1,0 +1,2215 @@
+<!-- ... existing code ... -->
+            <!-- Center: Realistic Slow World Clock, Season & Speed Controls -->
+            <div class="pointer-events-auto aoe-panel rounded-2xl px-3.5 py-2 flex items-center gap-3">
+                <div class="text-xs">
+                    <div class="flex items-center gap-2 font-bold text-amber-200">
+                        <span id="hud-season-icon">🌱</span>
+                        <span id="hud-season-name">Frühling</span>
+                        <span class="text-slate-400">•</span>
+                        <span id="hud-time-clock">Tag 1, 09:00</span>
+                    </div>
+                    <div class="flex items-center gap-2 text-[10px] text-slate-300 mt-0.5">
+                        <span id="hud-hand-context">☁️🖐️ Göttliche Wolkenhand bereit (Bewege Maus über Siedler, Bäume oder Baustellen)</span>
+                    </div>
+                </div>
+                <div class="flex items-center gap-1 border-l border-slate-700 pl-2">
+                    <button onclick="window.setTimeScale(0)" id="speed-0" title="Pause" class="px-2 py-1 rounded text-[10px] font-bold bg-slate-800 text-slate-300 hover:bg-slate-700">⏸</button>
+                    <button onclick="window.setTimeScale(1)" id="speed-1" title="Normal (Realistisch langsam)" class="px-2 py-1 rounded text-[10px] font-bold bg-amber-500 text-slate-950">1x</button>
+                    <button onclick="window.setTimeScale(2)" id="speed-2" title="Doppelt" class="px-2 py-1 rounded text-[10px] font-bold bg-slate-800 text-slate-300 hover:bg-slate-700">2x</button>
+                    <button onclick="window.setTimeScale(4)" id="speed-4" title="Schnellvorlauf" class="px-2 py-1 rounded text-[10px] font-bold bg-slate-800 text-slate-300 hover:bg-slate-700">4x</button>
+                </div>
+            </div>
+<!-- ... existing code ... -->
+    <script>
+        // ============================================================================
+        // 1. GLOBAL STATE, 5 CREATURE SLOTS & WORLD SAVE/LOAD SYSTEM
+        // ============================================================================
+        const EPOCHS = [
+            { id: 1, roman: 'I', name: 'Ursprung (Nomaden)', faithReq: 0, influenceRadius: 50 },
+            { id: 2, roman: 'II', name: 'Archaische Polis', faithReq: 100, influenceRadius: 72 },
+            { id: 3, roman: 'III', name: 'Klassische Metropole', faithReq: 260, influenceRadius: 96 },
+            { id: 4, roman: 'IV', name: 'Göttliches Imperium', faithReq: 500, influenceRadius: 126 }
+        ];
+
+        const SEASONS = [
+            { id: 'spring', name: 'Frühling', icon: '🌱', foliageColor: 0x387834, foodMult: 1.2 },
+            { id: 'summer', name: 'Sommer', icon: '☀️', foliageColor: 0x2c6829, foodMult: 1.35 },
+            { id: 'autumn', name: 'Herbst', icon: '🍂', foliageColor: 0xb85d1e, foodMult: 1.0 },
+            { id: 'winter', name: 'Winter', icon: '❄️', foliageColor: 0xdbeafe, foodMult: 0.7 }
+        ];
+
+        const SPECIES_META = {
+            lion: { icon: '🦁', label: 'Königslöwe' },
+            wolf: { icon: '🐺', label: 'Dire-Wolf' },
+            ape:  { icon: '🦍', label: 'Titan-Gorilla' },
+            tiger:{ icon: '🐯', label: 'Säbelzahn-Tiger' },
+            cow:  { icon: '🐮', label: 'Minotaurus-Stier' }
+        };
+
+        const DEFAULT_CREATURE_SLOTS = [
+            { slot: 1, name: 'Aurion (Löwe)', species: 'lion', color1: '#c87d32', color2: '#6b3410', eyeColor: '#f59e0b', scale: 1.12, muscle: 1.15, horns: 'none', armor: 'none' },
+            { slot: 2, name: 'Gorgor (Gorilla)', species: 'ape', color1: '#3b3d42', color2: '#1f2024', eyeColor: '#ef4444', scale: 1.18, muscle: 1.32, horns: 'none', armor: 'none' },
+            { slot: 3, name: 'Fenris (Wolf)', species: 'wolf', color1: '#525b66', color2: '#232931', eyeColor: '#38bdf8', scale: 1.05, muscle: 1.08, horns: 'none', armor: 'obsidian' },
+            { slot: 4, name: 'Rajah (Tiger)', species: 'tiger', color1: '#d96b1f', color2: '#1c1917', eyeColor: '#34d399', scale: 1.08, muscle: 1.12, horns: 'none', armor: 'gold' },
+            { slot: 5, name: 'Asterion (Stier)', species: 'cow', color1: '#6e472b', color2: '#29190e', eyeColor: '#fbbf24', scale: 1.16, muscle: 1.28, horns: 'curved', armor: 'gold' }
+        ];
+
+        const state = {
+            inTitleScreen: true,
+            mode: 'singleplayer',
+            epochIndex: 0,
+            faith: 15,
+            alignment: 0,
+            resources: { food: 160, wood: 160, ore: 90, mana: 280, pop: 7, maxPop: 16 },
+            time: {
+                day: 1,
+                hour: 10.2,
+                scale: 1,
+                seasonIndex: 0,
+                cosmicActive: null,
+                cosmicTimer: 0
+            },
+            activeSlotIndex: 0,
+            creatureSlots: JSON.parse(JSON.stringify(DEFAULT_CREATURE_SLOTS)),
+            creature: {
+                role: 'free',
+                hp: 100,
+                hunger: 10,
+                mesh: null,
+                joints: {},
+                targetPos: new THREE.Vector3(14, 0, 12),
+                stateText: 'Denkt nach & wacht über die Polis',
+                walkPhase: 0,
+                animMode: 'idle', // 'idle' | 'walk' | 'think' | 'roar' | 'work'
+                animTimer: 0
+            },
+            tribes: {
+                vikings: { name: 'Wikinger', impress: 35, pos: new THREE.Vector3(0, 0, -95) },
+                japanese: { name: 'Japaner', impress: 20, pos: new THREE.Vector3(95, 0, 5) },
+                aztecs: { name: 'Azteken', impress: 5, pos: new THREE.Vector3(-10, 0, 98) }
+            },
+            buildMode: null,
+            heldObject: null,
+            hoveredEntity: null,
+            lightningIntensity: 1.2,
+            tutorial: { active: false, step: 0 }
+        };
+
+        try {
+            const savedSlots = localStorage.getItem('godless_creature_slots_v2');
+            if (savedSlots) state.creatureSlots = JSON.parse(savedSlots);
+            const savedWorld = localStorage.getItem('godless_saved_world_v2');
+            if (savedWorld) {
+                const btn = document.getElementById('btn-continue-saved');
+                if (btn) { btn.classList.remove('hidden'); btn.classList.add('inline-flex'); }
+            }
+        } catch (e) {}
+
+        const SoundFX = {
+            ctx: null,
+            init() {
+                if (!this.ctx) {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    if (AudioCtx) this.ctx = new AudioCtx();
+                }
+            },
+            playTone(freq = 440, duration = 0.22, type = 'sine', gainVal = 0.07) {
+                try {
+                    this.init();
+                    if (!this.ctx) return;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                    gain.gain.setValueAtTime(gainVal, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + duration);
+                } catch (e) {}
+            },
+            playThunder() {
+                this.playTone(62, 0.52, 'sawtooth', 0.11);
+                setTimeout(() => this.playTone(44, 0.68, 'triangle', 0.09), 80);
+            },
+            playChime() {
+                this.playTone(523.25, 0.22, 'sine', 0.06);
+                setTimeout(() => this.playTone(659.25, 0.28, 'sine', 0.06), 90);
+                setTimeout(() => this.playTone(783.99, 0.4, 'sine', 0.07), 180);
+            }
+        };
+
+        // ============================================================================
+        // 2. HIGH-RESOLUTION PROCEDURAL TEXTURE & SPRITE FORGE (AssetForge)
+        //    Generates crisp 512x512 textures inspired by the B&W2 & AoE4 screenshots
+        // ============================================================================
+        const AssetForge = {
+            createRoofTileTexture() {
+                const c = document.createElement('canvas');
+                c.width = 512; c.height = 512;
+                const ctx = c.getContext('2d');
+                ctx.fillStyle = '#9e3b1c';
+                ctx.fillRect(0, 0, 512, 512);
+                const rows = 12, cols = 16;
+                const rw = 512 / cols, rh = 512 / rows;
+                for (let y = 0; y < rows; y++) {
+                    for (let x = 0; x < cols; x++) {
+                        const shade = (Math.random() - 0.5) * 26;
+                        ctx.fillStyle = `rgb(${176 + shade}, ${68 + shade * 0.6}, ${32 + shade * 0.4})`;
+                        ctx.fillRect(x * rw + 2, y * rh + 2, rw - 4, rh - 3);
+                        // Curved Roman/Greek imbrex ridge highlight
+                        const grad = ctx.createLinearGradient(x * rw, y * rh, (x + 1) * rw, y * rh);
+                        grad.addColorStop(0, 'rgba(0,0,0,0.38)');
+                        grad.addColorStop(0.5, 'rgba(255,210,160,0.28)');
+                        grad.addColorStop(1, 'rgba(0,0,0,0.42)');
+                        ctx.fillStyle = grad;
+                        ctx.fillRect(x * rw, y * rh, rw, rh);
+                    }
+                    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+                    ctx.fillRect(0, y * rh, 512, 3);
+                }
+                const tex = new THREE.CanvasTexture(c);
+                tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+                tex.repeat.set(2, 2);
+                return tex;
+            },
+
+            createVerdiDomeTexture() {
+                // Ribbed bronze/verdigris dome texture like sample12.png Temple!
+                const c = document.createElement('canvas');
+                c.width = 512; c.height = 512;
+                const ctx = c.getContext('2d');
+                ctx.fillStyle = '#3d5949';
+                ctx.fillRect(0, 0, 512, 512);
+                for (let x = 0; x < 512; x += 32) {
+                    ctx.fillStyle = 'rgba(212, 175, 55, 0.35)';
+                    ctx.fillRect(x, 0, 4, 512);
+                    ctx.fillStyle = 'rgba(15, 25, 20, 0.45)';
+                    ctx.fillRect(x + 4, 0, 3, 512);
+                }
+                for (let y = 0; y < 512; y += 48) {
+                    ctx.strokeStyle = 'rgba(215, 180, 75, 0.4)';
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(4, y + 4, 504, 40);
+                }
+                const tex = new THREE.CanvasTexture(c);
+                tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+                return tex;
+            },
+
+            createClassicalWallTexture() {
+                // Stucco & stone ashlar wall with classical windows & timber shutters (sample5 & sample12)
+                const c = document.createElement('canvas');
+                c.width = 512; c.height = 512;
+                const ctx = c.getContext('2d');
+                ctx.fillStyle = '#dfd3bc';
+                ctx.fillRect(0, 0, 512, 512);
+                // Subtle stone block courses
+                for (let y = 0; y < 512; y += 32) {
+                    ctx.fillStyle = 'rgba(90, 75, 58, 0.16)';
+                    ctx.fillRect(0, y, 512, 2);
+                    const offset = (y / 32) % 2 === 0 ? 0 : 32;
+                    for (let x = offset; x < 512; x += 64) {
+                        ctx.fillRect(x, y, 2, 32);
+                    }
+                }
+                // Classical upper & lower windows with wooden frames
+                const winCols = [80, 224, 368];
+                const winRows = [110, 300];
+                winRows.forEach(wy => {
+                    winCols.forEach(wx => {
+                        ctx.fillStyle = '#4a321c';
+                        ctx.fillRect(wx - 6, wy - 6, 76, 96);
+                        ctx.fillStyle = '#1e293b';
+                        ctx.fillRect(wx, wy, 64, 84);
+                        // Warm interior candle glow reflection
+                        const g = ctx.createRadialGradient(wx + 32, wy + 42, 4, wx + 32, wy + 42, 38);
+                        g.addColorStop(0, 'rgba(255, 200, 90, 0.55)');
+                        g.addColorStop(1, 'rgba(15, 23, 42, 0.9)');
+                        ctx.fillStyle = g;
+                        ctx.fillRect(wx, wy, 64, 84);
+                        // Window mullions
+                        ctx.fillStyle = '#5c3d22';
+                        ctx.fillRect(wx + 30, wy, 4, 84);
+                        ctx.fillRect(wx, wy + 40, 64, 4);
+                    });
+                });
+                const tex = new THREE.CanvasTexture(c);
+                tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+                return tex;
+            },
+
+            createCobbleRoadTexture() {
+                const c = document.createElement('canvas');
+                c.width = 256; c.height = 256;
+                const ctx = c.getContext('2d');
+                ctx.fillStyle = '#6c655b';
+                ctx.fillRect(0, 0, 256, 256);
+                for (let i = 0; i < 320; i++) {
+                    const rx = Math.random() * 256;
+                    const ry = Math.random() * 256;
+                    const r = 5 + Math.random() * 7;
+                    const v = 105 + Math.floor(Math.random() * 45);
+                    ctx.fillStyle = `rgb(${v}, ${v - 4}, ${v - 10})`;
+                    ctx.beginPath();
+                    ctx.arc(rx, ry, r, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = 'rgba(30,25,20,0.45)';
+                    ctx.lineWidth = 1.2;
+                    ctx.stroke();
+                }
+                const tex = new THREE.CanvasTexture(c);
+                tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+                return tex;
+            },
+
+            createHandSkinTexture() {
+                // Realistic human skin texture with subtle pores, knuckles & divine golden veins (sample1.jpg)
+                const c = document.createElement('canvas');
+                c.width = 512; c.height = 512;
+                const ctx = c.getContext('2d');
+                const baseGrad = ctx.createLinearGradient(0, 0, 512, 512);
+                baseGrad.addColorStop(0, '#f5caa6');
+                baseGrad.addColorStop(0.5, '#eab38c');
+                baseGrad.addColorStop(1, '#d6976e');
+                ctx.fillStyle = baseGrad;
+                ctx.fillRect(0, 0, 512, 512);
+
+                // Subtle skin warmth & knuckle creases
+                for (let i = 0; i < 600; i++) {
+                    ctx.fillStyle = i % 2 === 0 ? 'rgba(255,235,215,0.06)' : 'rgba(165,95,65,0.05)';
+                    ctx.beginPath();
+                    ctx.arc(Math.random() * 512, Math.random() * 512, 2 + Math.random() * 6, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                // Glowing Divine Golden Filigree Veins (as seen on the back of the hand in sample1.jpg!)
+                ctx.strokeStyle = 'rgba(255, 230, 130, 0.72)';
+                ctx.shadowColor = '#f5c542';
+                ctx.shadowBlur = 10;
+                ctx.lineWidth = 2.4;
+                for (let b = 0; b < 7; b++) {
+                    ctx.beginPath();
+                    let vx = 140 + b * 38;
+                    let vy = 490;
+                    ctx.moveTo(vx, vy);
+                    for (let s = 0; s < 10; s++) {
+                        vx += (Math.random() - 0.5) * 28;
+                        vy -= 42;
+                        ctx.lineTo(vx, vy);
+                    }
+                    ctx.stroke();
+                }
+                return new THREE.CanvasTexture(c);
+            },
+
+            createFurTexture(primaryHex, secondaryHex, isStriped = false) {
+                const c = document.createElement('canvas');
+                c.width = 512; c.height = 512;
+                const ctx = c.getContext('2d');
+                ctx.fillStyle = primaryHex;
+                ctx.fillRect(0, 0, 512, 512);
+
+                // Thousands of fine directional hair strands for realistic creature fur (sample1 & sample5)
+                for (let i = 0; i < 4200; i++) {
+                    const hx = Math.random() * 512;
+                    const hy = Math.random() * 512;
+                    ctx.strokeStyle = i % 3 === 0 ? secondaryHex : (i % 2 === 0 ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.22)');
+                    ctx.lineWidth = 1.4;
+                    ctx.beginPath();
+                    ctx.moveTo(hx, hy);
+                    ctx.lineTo(hx + (Math.random() - 0.5) * 4, hy + 8 + Math.random() * 7);
+                    ctx.stroke();
+                }
+
+                if (isStriped) {
+                    ctx.fillStyle = secondaryHex;
+                    for (let y = 20; y < 512; y += 44) {
+                        ctx.beginPath();
+                        ctx.ellipse(256, y, 220, 9, (Math.random() - 0.5) * 0.2, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+                const tex = new THREE.CanvasTexture(c);
+                tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+                return tex;
+            },
+
+            createCloudMistSpriteTexture() {
+                // Volumetric cloud/mist puff for the Hand of God (sample1.jpg & sample13.jpg)
+                const c = document.createElement('canvas');
+                c.width = 256; c.height = 256;
+                const ctx = c.getContext('2d');
+                const g = ctx.createRadialGradient(128, 128, 12, 128, 128, 120);
+                g.addColorStop(0, 'rgba(235, 252, 255, 0.88)');
+                g.addColorStop(0.38, 'rgba(135, 235, 250, 0.48)');
+                g.addColorStop(0.72, 'rgba(56, 189, 248, 0.16)');
+                g.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                ctx.fillStyle = g;
+                ctx.fillRect(0, 0, 256, 256);
+                return new THREE.CanvasTexture(c);
+            },
+
+            createFireSmokeTexture(isFire = true) {
+                const c = document.createElement('canvas');
+                c.width = 128; c.height = 128;
+                const ctx = c.getContext('2d');
+                const g = ctx.createRadialGradient(64, 64, 6, 64, 64, 60);
+                if (isFire) {
+                    g.addColorStop(0, 'rgba(255, 255, 200, 0.95)');
+                    g.addColorStop(0.35, 'rgba(255, 145, 20, 0.8)');
+                    g.addColorStop(0.7, 'rgba(220, 38, 38, 0.35)');
+                    g.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                } else {
+                    g.addColorStop(0, 'rgba(45, 45, 50, 0.72)');
+                    g.addColorStop(0.5, 'rgba(30, 30, 36, 0.42)');
+                    g.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                }
+                ctx.fillStyle = g;
+                ctx.fillRect(0, 0, 128, 128);
+                return new THREE.CanvasTexture(c);
+            }
+        };
+
+        // ============================================================================
+        // 3. TITLE SCREEN LIGHTNING & EMBER OVERLAY
+        // ============================================================================
+        const lightningCanvas = document.getElementById('lightning-fx-canvas');
+        const lCtx = lightningCanvas.getContext('2d');
+        const lightningBolts = [];
+        const cursorEmbers = [];
+        let lastMousePos = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+
+        function resizeOverlayCanvases() {
+            lightningCanvas.width = window.innerWidth;
+            lightningCanvas.height = window.innerHeight;
+            const gCanvas = document.getElementById('gesture-canvas');
+            if (gCanvas) {
+                gCanvas.width = window.innerWidth;
+                gCanvas.height = window.innerHeight;
+            }
+        }
+        window.addEventListener('resize', resizeOverlayCanvases);
+        resizeOverlayCanvases();
+
+        function spawnLightningBranch(x1, y1, x2, y2, color, thickness = 2.0) {
+            const segments = [];
+            const steps = 8;
+            let cx = x1, cy = y1;
+            for (let i = 1; i <= steps; i++) {
+                const t = i / steps;
+                const jitter = (1 - Math.abs(t - 0.5) * 2) * 30;
+                const nx = x1 + (x2 - x1) * t + (Math.random() - 0.5) * jitter;
+                const ny = y1 + (y2 - y1) * t + (Math.random() - 0.5) * jitter;
+                segments.push({ x1: cx, y1: cy, x2: nx, y2: ny });
+                cx = nx; cy = ny;
+            }
+            lightningBolts.push({ segments, color, alpha: 1.0, thickness });
+        }
+
+        window.addEventListener('mousemove', (e) => {
+            const dx = e.clientX - lastMousePos.x;
+            const dy = e.clientY - lastMousePos.y;
+            const speed = Math.hypot(dx, dy);
+            lastMousePos = { x: e.clientX, y: e.clientY };
+
+            if (state.inTitleScreen && speed > 7 && Math.random() < 0.4 * state.lightningIntensity) {
+                const boltColor = e.clientX < window.innerWidth * 0.48 ? '#f87171' : '#fde047';
+                const angle = Math.random() * Math.PI * 2;
+                const reach = 25 + Math.min(speed * 1.3, 85);
+                spawnLightningBranch(e.clientX, e.clientY, e.clientX + Math.cos(angle) * reach, e.clientY + Math.sin(angle) * reach, boltColor, 1.7);
+            }
+            if (state.inTitleScreen && Math.random() < 0.55) {
+                cursorEmbers.push({
+                    x: e.clientX + (Math.random() - 0.5) * 12,
+                    y: e.clientY + (Math.random() - 0.5) * 12,
+                    vx: (Math.random() - 0.5) * 1.1,
+                    vy: -0.7 - Math.random() * 1.4,
+                    size: 1.5 + Math.random() * 2.2,
+                    alpha: 0.9,
+                    color: Math.random() < 0.7 ? '#fbbf24' : '#38bdf8'
+                });
+            }
+        });
+
+        function renderLightningOverlay() {
+            lCtx.clearRect(0, 0, lightningCanvas.width, lightningCanvas.height);
+            for (let i = lightningBolts.length - 1; i >= 0; i--) {
+                const b = lightningBolts[i];
+                lCtx.save();
+                lCtx.globalAlpha = b.alpha;
+                lCtx.strokeStyle = b.color;
+                lCtx.lineWidth = b.thickness;
+                lCtx.shadowColor = b.color;
+                lCtx.shadowBlur = 12;
+                lCtx.beginPath();
+                for (const seg of b.segments) {
+                    lCtx.moveTo(seg.x1, seg.y1);
+                    lCtx.lineTo(seg.x2, seg.y2);
+                }
+                lCtx.stroke();
+                lCtx.restore();
+                b.alpha -= 0.06;
+                if (b.alpha <= 0) lightningBolts.splice(i, 1);
+            }
+            for (let i = cursorEmbers.length - 1; i >= 0; i--) {
+                const p = cursorEmbers[i];
+                p.x += p.vx; p.y += p.vy; p.alpha -= 0.025;
+                if (p.alpha <= 0) { cursorEmbers.splice(i, 1); continue; }
+                lCtx.save();
+                lCtx.globalAlpha = p.alpha;
+                lCtx.fillStyle = p.color;
+                lCtx.beginPath();
+                lCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                lCtx.fill();
+                lCtx.restore();
+            }
+        }
+
+        // ============================================================================
+        // 4. THREE.JS WORLD, WILDFLOWER MEADOWS & GLOWING INFLUENCE RIBBON (sample1 & 12)
+        // ============================================================================
+        const container = document.getElementById('webgl-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87b8e6);
+        scene.fog = new THREE.FogExp2(0x9dc3e6, 0.0017);
+
+        const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 1, 1000);
+        const cameraTarget = new THREE.Vector3(0, 4, 4);
+        const camSpherical = {
+            radius: 72,
+            theta: 0.0,
+            phi: 0.88
+        };
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.12;
+        container.appendChild(renderer.domElement);
+
+        const hemiLight = new THREE.HemisphereLight(0xe0f2fe, 0x3b4d28, 0.78);
+        scene.add(hemiLight);
+
+        const sunLight = new THREE.DirectionalLight(0xfff1d0, 1.45);
+        sunLight.position.set(90, 130, 70);
+        sunLight.castShadow = true;
+        sunLight.shadow.mapSize.width = 2048;
+        sunLight.shadow.mapSize.height = 2048;
+        const d = 145;
+        sunLight.shadow.camera.left = -d;
+        sunLight.shadow.camera.right = d;
+        sunLight.shadow.camera.top = d;
+        sunLight.shadow.camera.bottom = -d;
+        sunLight.shadow.camera.near = 10;
+        sunLight.shadow.camera.far = 360;
+        sunLight.shadow.bias = -0.0005;
+        scene.add(sunLight);
+
+        const sunOrb = new THREE.Mesh(new THREE.SphereGeometry(7, 20, 20), new THREE.MeshBasicMaterial({ color: 0xffe082 }));
+        const moonOrb = new THREE.Mesh(new THREE.SphereGeometry(5, 20, 20), new THREE.MeshBasicMaterial({ color: 0xe2e8f0 }));
+        scene.add(sunOrb, moonOrb);
+
+        function pseudoNoise(x, z) {
+            return Math.sin(x * 0.045) * Math.cos(z * 0.045) * 2.2
+                 + Math.sin(x * 0.11 + z * 0.08) * 0.85
+                 + Math.cos(x * 0.23 - z * 0.19) * 0.35;
+        }
+
+        function getTerrainHeight(x, z) {
+            const distFromCenter = Math.hypot(x, z);
+            if (distFromCenter > 154) return -4.8;
+
+            let h = Math.max(-3.6, (1 - Math.pow(distFromCenter / 146, 2.15)) * 8.8) + pseudoNoise(x, z) * 0.52;
+
+            // River canyon
+            const riverCurveX = Math.sin(z * 0.035) * 18 - (z > 0 ? z * 0.45 : 0);
+            const distToRiver = Math.abs(x - riverCurveX);
+            if (distToRiver < 10.5 && z < 48) {
+                const riverDepth = Math.cos((distToRiver / 10.5) * (Math.PI / 2)) * 5.8;
+                h -= riverDepth;
+            }
+
+            // Northern Alpine Range (as seen in sample5 & sample8 background)
+            const northDist = Math.hypot(x - 5, z + 100);
+            if (northDist < 56) {
+                const rawMtn = Math.pow(1 - northDist / 56, 1.5) * 26 + pseudoNoise(x * 1.8, z * 1.8) * 1.6;
+                h += Math.round(rawMtn * 0.8) / 0.8 * 0.35 + rawMtn * 0.65;
+            }
+
+            // Eastern Highland Plateau
+            const eastDist = Math.hypot(x - 95, z - 5);
+            if (eastDist < 44) {
+                h += Math.min(9.0, Math.pow(1 - eastDist / 44, 1.15) * 12.5);
+            }
+
+            // Southern Volcanic Caldera
+            const southDist = Math.hypot(x + 10, z - 102);
+            if (southDist < 44) {
+                h += Math.pow(1 - southDist / 44, 1.45) * 17;
+            }
+
+            // Flattened Classical Acropolis & Town Center Plaza
+            const centerPlazaDist = Math.hypot(x, z);
+            if (centerPlazaDist < 42) {
+                const blend = Math.min(1, Math.pow(centerPlazaDist / 42, 1.8));
+                h = h * blend + 4.35 * (1 - blend);
+            }
+            return h;
+        }
+
+        const terrainGeo = new THREE.PlaneGeometry(330, 330, 220, 220);
+        terrainGeo.rotateX(-Math.PI / 2);
+        const posAttr = terrainGeo.attributes.position;
+        for (let i = 0; i < posAttr.count; i++) {
+            const vx = posAttr.getX(i);
+            const vz = posAttr.getZ(i);
+            posAttr.setY(i, getTerrainHeight(vx, vz));
+        }
+        terrainGeo.computeVertexNormals();
+
+        const normAttr = terrainGeo.attributes.normal;
+        const colors = [];
+        const colorTmp = new THREE.Color();
+
+        for (let i = 0; i < posAttr.count; i++) {
+            const vx = posAttr.getX(i);
+            const vy = posAttr.getY(i);
+            const vz = posAttr.getZ(i);
+            const ny = normAttr.getY(i);
+            const centerDist = Math.hypot(vx, vz);
+            const micro = (Math.sin(vx * 0.21) * Math.cos(vz * 0.21)) * 0.04;
+
+            if (vy < 0.4) {
+                colorTmp.setRGB(0.84 + micro, 0.74 + micro, 0.52); // Warm Golden Coastline Sand
+            } else if (centerDist < 16) {
+                colorTmp.setRGB(0.68 + micro, 0.62 + micro, 0.51 + micro); // Classical Sanctuary Limestone
+            } else if (vy > 18.0) {
+                colorTmp.setRGB(0.93, 0.95, 0.98); // Snow-Capped Peaks
+            } else if (ny < 0.77 || vy > 11.2) {
+                colorTmp.setRGB(0.49 + micro, 0.46 + micro, 0.42 + micro); // Rocky Cliffside Strata
+            } else if (vz > 68) {
+                colorTmp.setRGB(0.38 + micro, 0.29 + micro, 0.23); // Volcanic Scorched Earth
+            } else {
+                const lush = Math.sin(vx * 0.07) * Math.cos(vz * 0.07) * 0.055;
+                colorTmp.setRGB(0.28 + lush + micro, 0.51 + lush + micro, 0.19 + micro); // Sunlit Meadow Grass
+            }
+            colors.push(colorTmp.r, colorTmp.g, colorTmp.b);
+        }
+        terrainGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+
+        const terrainMat = new THREE.MeshStandardMaterial({
+            vertexColors: true,
+            roughness: 0.86,
+            metalness: 0.03
+        });
+        const terrainMesh = new THREE.Mesh(terrainGeo, terrainMat);
+        terrainMesh.receiveShadow = true;
+        scene.add(terrainMesh);
+
+        // Instanced Wildflower & Lush Grass Meadow (Directly inspired by sample1.jpg!)
+        function populateWildflowerMeadow() {
+            const flowerColors = [0xa855f7, 0xef4444, 0xfacc15, 0xf97316, 0xec4899, 0x60a5fa];
+            const bladeGeo = new THREE.ConeGeometry(0.18, 0.65, 4);
+            bladeGeo.translate(0, 0.32, 0);
+            const grassMat = new THREE.MeshLambertMaterial({ color: 0x4d8c32 });
+            const grassInst = new THREE.InstancedMesh(bladeGeo, grassMat, 1800);
+
+            const dummy = new THREE.Object3D();
+            let gIdx = 0;
+            for (let i = 0; i < 1800; i++) {
+                const a = Math.random() * Math.PI * 2;
+                const r = 14 + Math.random() * 78;
+                const gx = Math.cos(a) * r;
+                const gz = Math.sin(a) * r;
+                const gy = getTerrainHeight(gx, gz);
+                if (gy < 1.2 || gy > 10.5) continue;
+                dummy.position.set(gx, gy, gz);
+                dummy.rotation.set((Math.random() - 0.5) * 0.25, Math.random() * Math.PI, (Math.random() - 0.5) * 0.25);
+                const s = 0.7 + Math.random() * 0.9;
+                dummy.scale.set(s, s, s);
+                dummy.updateMatrix();
+                grassInst.setMatrixAt(gIdx++, dummy.matrix);
+            }
+            scene.add(grassInst);
+
+            // Colorful Wildflower Blossoms
+            const blossomGeo = new THREE.DodecahedronGeometry(0.16, 0);
+            flowerColors.forEach(hex => {
+                const fMat = new THREE.MeshBasicMaterial({ color: hex });
+                const fInst = new THREE.InstancedMesh(blossomGeo, fMat, 140);
+                for (let j = 0; j < 140; j++) {
+                    const a = Math.random() * Math.PI * 2;
+                    const r = 15 + Math.random() * 68;
+                    const fx = Math.cos(a) * r;
+                    const fz = Math.sin(a) * r;
+                    const fy = getTerrainHeight(fx, fz);
+                    if (fy < 1.4 || fy > 9.5) continue;
+                    dummy.position.set(fx, fy + 0.38, fz);
+                    dummy.scale.setScalar(0.8 + Math.random() * 0.7);
+                    dummy.updateMatrix();
+                    fInst.setMatrixAt(j, dummy.matrix);
+                }
+                scene.add(fInst);
+            });
+        }
+        populateWildflowerMeadow();
+
+        // Water Surface
+        const waterGeo = new THREE.PlaneGeometry(460, 460, 48, 48);
+        waterGeo.rotateX(-Math.PI / 2);
+        const waterMat = new THREE.MeshStandardMaterial({
+            color: 0x1b6ca8,
+            roughness: 0.14,
+            metalness: 0.42,
+            transparent: true,
+            opacity: 0.88
+        });
+        const waterMesh = new THREE.Mesh(waterGeo, waterMat);
+        waterMesh.position.y = -0.15;
+        scene.add(waterMesh);
+
+        // Terrain-Hugging Glowing Emerald/Gold Influence Ribbon (Directly like sample12.png!)
+        let influenceRibbonGroup = new THREE.Group();
+        scene.add(influenceRibbonGroup);
+
+        function updateInfluenceRing() {
+            while (influenceRibbonGroup.children.length > 0) influenceRibbonGroup.remove(influenceRibbonGroup.children[0]);
+            const radius = EPOCHS[state.epochIndex].influenceRadius;
+            const segs = 128;
+            const ringColor = state.alignment < -20 ? 0xef4444 : (state.alignment > 20 ? 0x38bdf8 : 0x4ade80);
+
+            const pts = [];
+            for (let i = 0; i <= segs; i++) {
+                const a = (i / segs) * Math.PI * 2;
+                const rx = Math.cos(a) * radius;
+                const rz = Math.sin(a) * radius;
+                const ry = Math.max(0.2, getTerrainHeight(rx, rz) + 0.32);
+                pts.push(new THREE.Vector3(rx, ry, rz));
+            }
+            const curve = new THREE.CatmullRomCurve3(pts, true);
+            const tubeGeo = new THREE.TubeGeometry(curve, 128, 0.55, 8, true);
+            const tubeMat = new THREE.MeshBasicMaterial({ color: ringColor, transparent: true, opacity: 0.75 });
+            const outerGlowGeo = new THREE.TubeGeometry(curve, 128, 1.35, 8, true);
+            const outerGlowMat = new THREE.MeshBasicMaterial({ color: ringColor, transparent: true, opacity: 0.24 });
+            influenceRibbonGroup.add(new THREE.Mesh(tubeGeo, tubeMat), new THREE.Mesh(outerGlowGeo, outerGlowMat));
+        }
+        updateInfluenceRing();
+
+        // ============================================================================
+        // 5. ANATOMICALLY SCULPTED 3D HUMAN HAND OF GOD IN VOLUMETRIC CLOUD MIST
+        //    Modeled directly after sample1.jpg & sample13.jpg (Smooth organic fingers,
+        //    golden veins, fingernails, thumb webbing, and swirling cloud/mist collar!)
+        // ============================================================================
+        const handGroup = new THREE.Group();
+        const handSkinTex = AssetForge.createHandSkinTexture();
+        const cloudMistTex = AssetForge.createCloudMistSpriteTexture();
+
+        const handRig = {
+            wrist: new THREE.Group(),
+            fingers: [],
+            thumb: null,
+            cloudSprites: [],
+            palmOrb: null,
+            skinMat: new THREE.MeshStandardMaterial({
+                map: handSkinTex,
+                roughness: 0.42,
+                metalness: 0.06,
+                emissive: new THREE.Color(0x553311),
+                emissiveIntensity: 0.14
+            }),
+            nailMat: new THREE.MeshStandardMaterial({ color: 0xfbe4d5, roughness: 0.25, metalness: 0.1 }),
+            auraLight: new THREE.PointLight(0x67e8f9, 1.35, 22),
+            curlTarget: 0.22,
+            curlCurrent: 0.22
+        };
+
+        function buildArticulatedHandOfGod() {
+            handGroup.add(handRig.wrist);
+            handRig.wrist.position.set(0, 3.6, 0);
+            handRig.wrist.rotation.x = 0.32;
+
+            // 1. Sculpted Organic Metacarpal Palm (Merged rounded anatomy instead of a flat box)
+            const palmCore = new THREE.Mesh(new THREE.SphereGeometry(1.08, 24, 20), handRig.skinMat);
+            palmCore.scale.set(0.96, 0.42, 1.12);
+            palmCore.castShadow = true;
+            handRig.wrist.add(palmCore);
+
+            // Knuckle Ridge Bridge across the 4 fingers
+            const knuckleBridge = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 1.56, 16), handRig.skinMat);
+            knuckleBridge.rotation.z = Math.PI / 2;
+            knuckleBridge.position.set(0, 0.02, -0.88);
+            knuckleBridge.scale.set(1, 1, 0.72);
+            handRig.wrist.add(knuckleBridge);
+
+            // Muscular Thenar Eminence (Thumb base muscle pad) & Hypothenar heel pad
+            const thenarPad = new THREE.Mesh(new THREE.SphereGeometry(0.54, 16, 14), handRig.skinMat);
+            thenarPad.scale.set(0.85, 0.55, 1.25);
+            thenarPad.position.set(-0.62, -0.14, 0.12);
+            thenarPad.rotation.y = 0.4;
+            handRig.wrist.add(thenarPad);
+
+            // Smooth Tapered Wrist disappearing into the Cloud Mist
+            const wristNeck = new THREE.Mesh(new THREE.CylinderGeometry(0.68, 0.58, 1.65, 20), handRig.skinMat);
+            wristNeck.rotation.x = Math.PI / 2.2;
+            wristNeck.position.set(0, 0.25, 1.45);
+            handRig.wrist.add(wristNeck);
+
+            // 2. Five Anatomically Tapered Fingers with Smooth Joints & Fingernails
+            const fingerSpecs = [
+                { x: -0.66, y: 0.01, z: -0.92, spread:  0.08, len: 0.68, r: 0.185 }, // Index
+                { x: -0.22, y: 0.04, z: -1.00, spread:  0.02, len: 0.76, r: 0.195 }, // Middle
+                { x:  0.23, y: 0.02, z: -0.95, spread: -0.03, len: 0.70, r: 0.185 }, // Ring
+                { x:  0.64, y: -0.03, z: -0.82, spread: -0.10, len: 0.56, r: 0.155 } // Pinky
+            ];
+
+            fingerSpecs.forEach((spec) => {
+                const knucklePivot = new THREE.Group();
+                knucklePivot.position.set(spec.x, spec.y, spec.z);
+                knucklePivot.rotation.y = spec.spread;
+                handRig.wrist.add(knucklePivot);
+
+                const kJoint = new THREE.Mesh(new THREE.SphereGeometry(spec.r * 1.04, 14, 14), handRig.skinMat);
+                knucklePivot.add(kJoint);
+
+                // Proximal Phalanx
+                const prox = new THREE.Mesh(new THREE.CylinderGeometry(spec.r * 0.88, spec.r * 1.02, spec.len, 16), handRig.skinMat);
+                prox.rotation.x = Math.PI / 2;
+                prox.position.z = -spec.len / 2;
+                prox.castShadow = true;
+                knucklePivot.add(prox);
+
+                // PIP Middle Joint
+                const midPivot = new THREE.Group();
+                midPivot.position.z = -spec.len;
+                knucklePivot.add(midPivot);
+
+                const mJoint = new THREE.Mesh(new THREE.SphereGeometry(spec.r * 0.88, 14, 14), handRig.skinMat);
+                midPivot.add(mJoint);
+
+                const midLen = spec.len * 0.78;
+                const midMesh = new THREE.Mesh(new THREE.CylinderGeometry(spec.r * 0.76, spec.r * 0.88, midLen, 16), handRig.skinMat);
+                midMesh.rotation.x = Math.PI / 2;
+                midMesh.position.z = -midLen / 2;
+                midMesh.castShadow = true;
+                midPivot.add(midMesh);
+
+                // DIP Distal Joint & Fingertip with Realistic Fingernail
+                const tipPivot = new THREE.Group();
+                tipPivot.position.z = -midLen;
+                midPivot.add(tipPivot);
+
+                const tJoint = new THREE.Mesh(new THREE.SphereGeometry(spec.r * 0.76, 12, 12), handRig.skinMat);
+                tipPivot.add(tJoint);
+
+                const tipLen = spec.len * 0.65;
+                const tipMesh = new THREE.Mesh(new THREE.CylinderGeometry(spec.r * 0.62, spec.r * 0.76, tipLen, 16), handRig.skinMat);
+                tipMesh.rotation.x = Math.PI / 2;
+                tipMesh.position.z = -tipLen / 2;
+                tipPivot.add(tipMesh);
+
+                const fingerPad = new THREE.Mesh(new THREE.SphereGeometry(spec.r * 0.64, 14, 14), handRig.skinMat);
+                fingerPad.scale.set(1.0, 0.82, 1.15);
+                fingerPad.position.z = -tipLen;
+                tipPivot.add(fingerPad);
+
+                // Fingernail plate on top of distal phalanx
+                const nail = new THREE.Mesh(new THREE.BoxGeometry(spec.r * 0.88, 0.03, tipLen * 0.55), handRig.nailMat);
+                nail.position.set(0, spec.r * 0.54, -tipLen * 0.72);
+                nail.rotation.x = 0.08;
+                tipPivot.add(nail);
+
+                handRig.fingers.push({ knucklePivot, midPivot, tipPivot, baseSpread: spec.spread });
+            });
+
+            // 3. Sculpted Opposable Thumb with Nail
+            const thumbBase = new THREE.Group();
+            thumbBase.position.set(-0.88, -0.10, -0.18);
+            thumbBase.rotation.set(0.15, 0.68, -0.25);
+            handRig.wrist.add(thumbBase);
+
+            const thumbProx = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.24, 0.65, 16), handRig.skinMat);
+            thumbProx.rotation.x = Math.PI / 2;
+            thumbProx.position.z = -0.32;
+            thumbBase.add(thumbProx);
+
+            const thumbTipPivot = new THREE.Group();
+            thumbTipPivot.position.z = -0.65;
+            thumbBase.add(thumbTipPivot);
+
+            const thumbJoint = new THREE.Mesh(new THREE.SphereGeometry(0.19, 12, 12), handRig.skinMat);
+            thumbTipPivot.add(thumbJoint);
+
+            const thumbDist = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.19, 0.56, 16), handRig.skinMat);
+            thumbDist.rotation.x = Math.PI / 2;
+            thumbDist.position.z = -0.28;
+            thumbTipPivot.add(thumbDist);
+
+            const thumbPad = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 12), handRig.skinMat);
+            thumbPad.position.z = -0.56;
+            thumbTipPivot.add(thumbPad);
+
+            const thumbNail = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.03, 0.28), handRig.nailMat);
+            thumbNail.position.set(0, 0.13, -0.42);
+            thumbTipPivot.add(thumbNail);
+
+            handRig.thumb = { thumbBase, thumbTipPivot };
+
+            // 4.Glowing Magical Energy Orb held in the Hand (Directly like sample1.jpg!)
+            const orbGroup = new THREE.Group();
+            orbGroup.position.set(0, -0.32, -0.55);
+            const innerOrb = new THREE.Mesh(
+                new THREE.SphereGeometry(0.46, 20, 20),
+                new THREE.MeshBasicMaterial({ color: 0xe0f2fe, transparent: true, opacity: 0.85 })
+            );
+            const outerAuraOrb = new THREE.Mesh(
+                new THREE.SphereGeometry(0.76, 20, 20),
+                new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.32, wireframe: true })
+            );
+            orbGroup.add(innerOrb, outerAuraOrb);
+            handRig.wrist.add(orbGroup);
+            handRig.palmOrb = orbGroup;
+
+            // 5. Billowing Volumetric Cloud Mist around Wrist & Hand (sample1.jpg & sample13.jpg)
+            for (let i = 0; i < 16; i++) {
+                const sMat = new THREE.SpriteMaterial({
+                    map: cloudMistTex,
+                    color: 0xdbeafe,
+                    transparent: true,
+                    opacity: 0.62,
+                    depthWrite: false,
+                    blending: THREE.AdditiveBlending
+                });
+                const sp = new THREE.Sprite(sMat);
+                const angle = (i / 16) * Math.PI * 2;
+                const rad = 0.45 + (i % 3) * 0.42;
+                sp.position.set(
+                    Math.cos(angle) * rad,
+                    0.15 + (Math.random() - 0.5) * 0.45,
+                    1.15 + Math.sin(angle) * 0.65 + (i % 2) * 0.4
+                );
+                const sz = 2.1 + (i % 4) * 0.55;
+                sp.scale.set(sz, sz, 1);
+                sp.userData = { baseAngle: angle, rad, baseZ: sp.position.z, speed: 0.8 + Math.random() * 0.8, phase: i * 0.6 };
+                handRig.wrist.add(sp);
+                handRig.cloudSprites.push(sp);
+            }
+
+            // Ground projection halo
+            const groundRing = new THREE.Mesh(
+                new THREE.RingGeometry(1.2, 1.75, 40),
+                new THREE.MeshBasicMaterial({ color: 0x7dd3fc, side: THREE.DoubleSide, transparent: true, opacity: 0.52 })
+            );
+            groundRing.rotation.x = -Math.PI / 2;
+            groundRing.position.y = 0.14;
+            handGroup.add(groundRing);
+
+            handRig.auraLight.position.set(0, 2.2, 0);
+            handGroup.add(handRig.auraLight);
+            scene.add(handGroup);
+        }
+        buildArticulatedHandOfGod();
+
+        function animateHandOfGod(dt, now) {
+            if (state.heldObject) {
+                handRig.curlTarget = 1.08; // Gripping object
+            } else if (isDrawingGesture) {
+                handRig.curlTarget = 0.88; // Pointing index finger like sample13.jpg
+            } else if (state.hoveredEntity) {
+                handRig.curlTarget = 0.45; // Cradling magical energy orb like sample1.jpg
+            } else {
+                handRig.curlTarget = 0.26 + Math.sin(now * 0.0028) * 0.06;
+            }
+
+            handRig.curlCurrent += (handRig.curlTarget - handRig.curlCurrent) * Math.min(1, dt * 12);
+
+            // Gentle floating motion of the wrist in its cloud
+            handRig.wrist.position.y = 3.55 + Math.sin(now * 0.0032) * 0.16;
+            handRig.wrist.rotation.z = Math.sin(now * 0.0018) * 0.05;
+
+            handRig.fingers.forEach((f, idx) => {
+                const wave = Math.sin(now * 0.004 + idx * 0.55) * 0.04;
+                const c = (isDrawingGesture && idx === 0) ? 0.05 : (handRig.curlCurrent + wave);
+                f.knucklePivot.rotation.x = -c * 0.72;
+                f.midPivot.rotation.x = -c * 0.96;
+                f.tipPivot.rotation.x = -c * 0.68;
+            });
+
+            if (handRig.thumb) {
+                handRig.thumb.thumbBase.rotation.x = 0.15 - handRig.curlCurrent * 0.48;
+                handRig.thumb.thumbBase.rotation.z = -0.25 - handRig.curlCurrent * 0.42;
+                handRig.thumb.thumbTipPivot.rotation.x = -handRig.curlCurrent * 0.65;
+            }
+
+            // Animate swirling cloud mist sprites & palm energy orb
+            if (handRig.palmOrb) {
+                handRig.palmOrb.rotation.y += dt * 1.8;
+                handRig.palmOrb.rotation.z -= dt * 1.2;
+                const orbScale = state.heldObject ? 0.01 : (isDrawingGesture || state.hoveredEntity ? 1.15 : 0.78);
+                handRig.palmOrb.scale.setScalar(orbScale + Math.sin(now * 0.006) * 0.06);
+            }
+
+            const cloudTint = state.alignment < -25 ? 0xfca5a5 : (state.alignment > 25 ? 0xbae6fd : 0xe0f2fe);
+            handRig.cloudSprites.forEach((sp) => {
+                const u = sp.userData;
+                const a = u.baseAngle + now * 0.0008 * u.speed;
+                sp.position.x = Math.cos(a) * u.rad;
+                sp.position.y = 0.15 + Math.sin(now * 0.003 + u.phase) * 0.22;
+                sp.material.color.setHex(cloudTint);
+            });
+        }
+
+        // ============================================================================
+        // 6. CLASSICAL DOMED TEMPLE, TOWN CENTER PLAZA & MULTI-STAGE BUILDINGS
+        //    Includes rotating construction cranes, rising masonry, and 4-stage
+        //    fire/smoke/debris destruction animations (sample1, sample10, sample12, sample13)
+        // ============================================================================
+        const buildings = [];
+        const resourcesNodes = [];
+        const villagers = [];
+        const roadDecals = [];
+        const particles = [];
+
+        const roofTileTex = AssetForge.createRoofTileTexture();
+        const verdiDomeTex = AssetForge.createVerdiDomeTexture();
+        const wallFacadeTex = AssetForge.createClassicalWallTexture();
+        const cobbleRoadTex = AssetForge.createCobbleRoadTexture();
+        const fireSpriteTex = AssetForge.createFireSmokeTexture(true);
+        const smokeSpriteTex = AssetForge.createFireSmokeTexture(false);
+
+        const sharedMats = {
+            marble: new THREE.MeshStandardMaterial({ color: 0xf3efe6, roughness: 0.38 }),
+            facade: new THREE.MeshStandardMaterial({ map: wallFacadeTex, roughness: 0.72 }),
+            terracotta: new THREE.MeshStandardMaterial({ map: roofTileTex, roughness: 0.55 }),
+            verdiDome: new THREE.MeshStandardMaterial({ map: verdiDomeTex, roughness: 0.42, metalness: 0.35 }),
+            goldTrim: new THREE.MeshStandardMaterial({ color: 0xf5c542, metalness: 0.78, roughness: 0.22 }),
+            timber: new THREE.MeshStandardMaterial({ color: 0x5c3a1e, roughness: 0.85 }),
+            scaffold: new THREE.MeshStandardMaterial({ color: 0xc89d66, roughness: 0.8 }),
+            stone: new THREE.MeshStandardMaterial({ color: 0x7c8288, roughness: 0.78 }),
+            cobble: new THREE.MeshStandardMaterial({ map: cobbleRoadTex, roughness: 0.85 }),
+            charred: new THREE.MeshStandardMaterial({ color: 0x242220, roughness: 0.95 }),
+            wheat: new THREE.MeshStandardMaterial({ color: 0xeab308, roughness: 0.65 }),
+            skin: new THREE.MeshStandardMaterial({ color: 0xf1c29d, roughness: 0.55 }),
+            hairDark: new THREE.MeshStandardMaterial({ color: 0x271c15, roughness: 0.85 }),
+            innerSanctuaryGlow: new THREE.MeshBasicMaterial({ color: 0xffd56b })
+        };
+
+        function createCobbleRoadTo(targetX, targetZ) {
+            const dist = Math.hypot(targetX, targetZ);
+            if (dist < 5) return;
+            const steps = Math.floor(dist / 2.2);
+            for (let i = 1; i <= steps; i++) {
+                const t = i / steps;
+                const rx = targetX * t + Math.sin(t * Math.PI) * 0.9;
+                const rz = targetZ * t;
+                const ry = getTerrainHeight(rx, rz);
+                const roadTile = new THREE.Mesh(new THREE.CylinderGeometry(1.55, 1.65, 0.10, 12), sharedMats.cobble);
+                roadTile.position.set(rx, ry + 0.03, rz);
+                roadTile.receiveShadow = true;
+                scene.add(roadTile);
+                roadDecals.push(roadTile);
+            }
+        }
+
+        // Classical Domed Temple + Circular Town Center Plaza (Modeled directly after sample12.png & sample13.jpg!)
+        const templeGroup = new THREE.Group();
+        scene.add(templeGroup);
+
+        function rebuildTempleMesh() {
+            while (templeGroup.children.length > 0) templeGroup.remove(templeGroup.children[0]);
+            const epochId = EPOCHS[state.epochIndex].id;
+            templeGroup.position.set(-14, getTerrainHeight(-14, -4), -4);
+
+            // 1. Stepped Marble Acropolis Podium & Grand Front Staircase (sample12.png left)
+            const podium = new THREE.Mesh(new THREE.BoxGeometry(11.5, 2.2, 13.5), sharedMats.marble);
+            podium.position.y = 1.1;
+            podium.castShadow = true;
+            podium.receiveShadow = true;
+            templeGroup.add(podium);
+
+            for (let st = 0; st < 5; st++) {
+                const stair = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.42, 0.9), sharedMats.marble);
+                stair.position.set(0, st * 0.42 + 0.21, 7.2 - st * 0.45);
+                templeGroup.add(stair);
+            }
+
+            // Two Blazing Golden Braziers flanking the Temple Stairs (sample12.png!)
+            [-3.4, 3.4].forEach(bx => {
+                const pedestal = new THREE.Mesh(new THREE.BoxGeometry(1.3, 2.8, 1.3), sharedMats.marble);
+                pedestal.position.set(bx, 1.4, 7.2);
+                const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 0.4, 0.7, 12), sharedMats.goldTrim);
+                bowl.position.set(bx, 3.1, 7.2);
+                const flame = new THREE.Sprite(new THREE.SpriteMaterial({ map: fireSpriteTex, blending: THREE.AdditiveBlending }));
+                flame.position.set(bx, 4.1, 7.2);
+                flame.scale.set(2.4, 2.8, 1);
+                templeGroup.add(pedestal, bowl, flame);
+            });
+
+            // 2. Main Rectangular Sanctuary Hall + Front Columned Portico + Triangular Pediment
+            const hall = new THREE.Mesh(new THREE.BoxGeometry(8.6, 5.2, 8.8), sharedMats.facade);
+            hall.position.set(0, 4.8, -0.5);
+            hall.castShadow = true;
+            templeGroup.add(hall);
+
+            // Portico Columns
+            [-3.2, -1.1, 1.1, 3.2].forEach(cx => {
+                const col = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.44, 5.2, 14), sharedMats.marble);
+                col.position.set(cx, 4.8, 5.2);
+                col.castShadow = true;
+                templeGroup.add(col);
+            });
+
+            // Portico Pitched Roof
+            const porticoRoof = new THREE.Mesh(new THREE.ConeGeometry(5.8, 2.2, 4), sharedMats.verdiDome);
+            porticoRoof.rotation.y = Math.PI / 4;
+            porticoRoof.scale.set(1.05, 1, 0.85);
+            porticoRoof.position.set(0, 8.4, 3.6);
+            templeGroup.add(porticoRoof);
+
+            // 3. Upper Illuminated Rotunda Tholos & Ribbed Verdigris/Bronze Dome (sample12.png!)
+            const innerGlowCore = new THREE.Mesh(new THREE.CylinderGeometry(3.1, 3.1, 3.4, 16), sharedMats.innerSanctuaryGlow);
+            innerGlowCore.position.set(0, 9.1, -1.2);
+            templeGroup.add(innerGlowCore);
+
+            const rotundaCols = 12;
+            for (let i = 0; i < rotundaCols; i++) {
+                const a = (i / rotundaCols) * Math.PI * 2;
+                const rCol = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.30, 3.5, 10), sharedMats.marble);
+                rCol.position.set(Math.cos(a) * 3.65, 9.1, -1.2 + Math.sin(a) * 3.65);
+                templeGroup.add(rCol);
+            }
+
+            const dome = new THREE.Mesh(
+                new THREE.SphereGeometry(4.15, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.52),
+                epochId >= 4 ? sharedMats.goldTrim : sharedMats.verdiDome
+            );
+            dome.position.set(0, 10.8, -1.2);
+            dome.castShadow = true;
+            templeGroup.add(dome);
+
+            // Oculus Ring at top of Dome
+            const oculus = new THREE.Mesh(new THREE.TorusGeometry(0.85, 0.22, 10, 24), sharedMats.goldTrim);
+            oculus.rotation.x = Math.PI / 2;
+            oculus.position.set(0, 14.8, -1.2);
+            templeGroup.add(oculus);
+
+            // 4. Circular Stepped Town Center Plaza with Statue & Sacred Flame (sample9, sample12 & sample13!)
+            const plazaGroup = new THREE.Group();
+            plazaGroup.position.set(16, 0, -2); // Positioned to the right of the Temple just like sample12.png!
+            for (let s = 0; s < 4; s++) {
+                const stepDisc = new THREE.Mesh(new THREE.CylinderGeometry(8.5 - s * 1.1, 9.0 - s * 1.1, 0.36, 32), sharedMats.marble);
+                stepDisc.position.y = s * 0.36 + 0.18;
+                stepDisc.receiveShadow = true;
+                plazaGroup.add(stepDisc);
+            }
+            const centralAltar = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1.8, 3.2), sharedMats.facade);
+            centralAltar.position.y = 2.3;
+            plazaGroup.add(centralAltar);
+
+            // Divine Sky Beacon Beam rising from the Town Center (Directly like sample13.jpg!)
+            const beaconBeam = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.65, 1.45, 85, 16, 1, true),
+                new THREE.MeshBasicMaterial({ color: 0x67e8f9, transparent: true, opacity: 0.24, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false })
+            );
+            beaconBeam.position.y = 44;
+            beaconBeam.name = 'manaCrystal';
+            plazaGroup.add(beaconBeam);
+
+            templeGroup.add(plazaGroup);
+        }
+        rebuildTempleMesh();
+
+        // Multi-Stage AoE4 / B&W2 Building System with Rotating Construction Crane, Rising Brickwork,
+        // Fire/Smoke Plumes, and Falling Rubble Physics
+        function createDetailedBuilding(type, x, z, isPrebuilt = false) {
+            const y = getTerrainHeight(x, z);
+            const root = new THREE.Group();
+            root.position.set(x, y, z);
+
+            // 1. Stone Foundation & Courtyard Plinth
+            const foundation = new THREE.Mesh(new THREE.BoxGeometry(5.6, 0.55, 5.0), sharedMats.stone);
+            foundation.position.y = 0.27;
+            foundation.receiveShadow = true;
+            root.add(foundation);
+
+            // 2. Detailed AoE4 Construction Scaffolding + Rotating Medieval Wooden Crane
+            const scaffoldGroup = new THREE.Group();
+            const postCoords = [[-2.6, -2.2], [2.6, -2.2], [-2.6, 2.2], [2.6, 2.2], [0, -2.2], [0, 2.2]];
+            postCoords.forEach(([px, pz]) => {
+                const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 4.6, 6), sharedMats.scaffold);
+                pole.position.set(px, 2.3, pz);
+                scaffoldGroup.add(pole);
+            });
+            for (let h = 1.3; h <= 3.9; h += 1.3) {
+                const plankF = new THREE.Mesh(new THREE.BoxGeometry(5.4, 0.10, 0.45), sharedMats.scaffold);
+                plankF.position.set(0, h, 2.2);
+                const plankB = plankF.clone(); plankB.position.z = -2.2;
+                scaffoldGroup.add(plankF, plankB);
+            }
+
+            // Rotating Treadwheel Crane (`Baukran`) on side of construction site
+            const cranePivot = new THREE.Group();
+            cranePivot.position.set(-2.9, 0.5, 0);
+            const craneMast = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.20, 5.4, 8), sharedMats.timber);
+            craneMast.position.y = 2.7;
+            const craneBoom = new THREE.Mesh(new THREE.BoxGeometry(3.8, 0.18, 0.18), sharedMats.timber);
+            craneBoom.position.set(1.4, 5.2, 0);
+            craneBoom.rotation.z = 0.22;
+            const craneRope = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 2.2, 6), sharedMats.scaffold);
+            craneRope.position.set(2.9, 4.3, 0);
+            const suspendedBlock = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.45, 0.45), sharedMats.marble);
+            suspendedBlock.position.set(2.9, 3.1, 0);
+            cranePivot.add(craneMast, craneBoom, craneRope, suspendedBlock);
+            scaffoldGroup.add(cranePivot);
+            root.add(scaffoldGroup);
+
+            // 3. Detailed Main Architecture + Exposed Timber Rafters + Terracotta Tiled Roof
+            const mainGroup = new THREE.Group();
+            const raftersGroup = new THREE.Group();
+            const roofGroup = new THREE.Group();
+            let windmillSails = null;
+
+            // Exposed wooden roof trusses visible during 55%-85% construction or heavy damage!
+            for (let rx = -1.6; rx <= 1.6; rx += 0.8) {
+                const trussL = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.9, 0.12), sharedMats.timber);
+                trussL.position.set(rx, 3.3, -0.65);
+                trussL.rotation.x = 0.65;
+                const trussR = trussL.clone();
+                trussR.position.z = 0.65;
+                trussR.rotation.x = -0.65;
+                raftersGroup.add(trussL, trussR);
+            }
+            mainGroup.add(raftersGroup);
+
+            if (type === 'house') {
+                // Classical 2-Story Greco-Roman Villa with Terracotta Roof, Colonnade Porch & Chimney (sample5 & sample12)
+                const lowerBody = new THREE.Mesh(new THREE.BoxGeometry(4.2, 2.6, 3.6), sharedMats.facade);
+                lowerBody.position.y = 1.6;
+                lowerBody.castShadow = true;
+                mainGroup.add(lowerBody);
+
+                // Side Wing / L-Shape Annex (like sample12.png villas!)
+                const sideWing = new THREE.Mesh(new THREE.BoxGeometry(2.2, 2.0, 2.4), sharedMats.facade);
+                sideWing.position.set(1.8, 1.3, 1.2);
+                sideWing.castShadow = true;
+                mainGroup.add(sideWing);
+
+                // Timber Balcony & Columns
+                [-1.5, -0.5, 0.5].forEach(cx => {
+                    const porchCol = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 1.8, 8), sharedMats.marble);
+                    porchCol.position.set(cx, 1.2, 2.1);
+                    mainGroup.add(porchCol);
+                });
+
+                const chimney = new THREE.Mesh(new THREE.BoxGeometry(0.65, 4.1, 0.65), sharedMats.stone);
+                chimney.position.set(-1.35, 2.35, -0.9);
+                mainGroup.add(chimney);
+
+                const mainRoof = new THREE.Mesh(new THREE.ConeGeometry(3.45, 1.65, 4), sharedMats.terracotta);
+                mainRoof.rotation.y = Math.PI / 4;
+                mainRoof.scale.set(1.08, 1, 0.95);
+                mainRoof.position.y = 3.65;
+                mainRoof.castShadow = true;
+
+                const wingRoof = new THREE.Mesh(new THREE.ConeGeometry(2.0, 1.1, 4), sharedMats.terracotta);
+                wingRoof.rotation.y = Math.PI / 4;
+                wingRoof.position.set(1.8, 2.8, 1.2);
+                roofGroup.add(mainRoof, wingRoof);
+
+                state.resources.maxPop += 4;
+            } else if (type === 'mill') {
+                const lowerBase = new THREE.Mesh(new THREE.CylinderGeometry(1.75, 2.1, 2.3, 12), sharedMats.stone);
+                lowerBase.position.y = 1.4;
+                lowerBase.castShadow = true;
+                const upperTower = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.75, 2.5, 12), sharedMats.facade);
+                upperTower.position.y = 3.7;
+                upperTower.castShadow = true;
+                mainGroup.add(lowerBase, upperTower);
+
+                const domeCap = new THREE.Mesh(new THREE.ConeGeometry(1.65, 1.5, 12), sharedMats.terracotta);
+                domeCap.position.y = 5.65;
+                roofGroup.add(domeCap);
+
+                windmillSails = new THREE.Group();
+                windmillSails.position.set(0, 4.2, 1.65);
+                for (let s = 0; s < 4; s++) {
+                    const armGroup = new THREE.Group();
+                    armGroup.rotation.z = (Math.PI / 2) * s;
+                    const spar = new THREE.Mesh(new THREE.BoxGeometry(0.16, 4.2, 0.12), sharedMats.timber);
+                    const cloth = new THREE.Mesh(new THREE.BoxGeometry(0.62, 3.2, 0.04), sharedMats.marble);
+                    cloth.position.set(0.24, 0.3, 0.04);
+                    armGroup.add(spar, cloth);
+                    windmillSails.add(armGroup);
+                }
+                roofGroup.add(windmillSails);
+
+                for (let wx = -1; wx <= 1; wx++) {
+                    for (let wz = -1; wz <= 1; wz++) {
+                        if (wx === 0 && wz === 0) continue;
+                        const field = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.42, 2.2), sharedMats.wheat);
+                        field.position.set(wx * 2.8, 0.25, wz * 2.8);
+                        field.receiveShadow = true;
+                        root.add(field);
+                    }
+                }
+            } else if (type === 'warehouse') {
+                const hall = new THREE.Mesh(new THREE.BoxGeometry(4.6, 2.6, 3.6), sharedMats.facade);
+                hall.position.y = 1.55;
+                hall.castShadow = true;
+                mainGroup.add(hall);
+                for (let c = 0; c < 4; c++) {
+                    const crate = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.7), sharedMats.scaffold);
+                    crate.position.set(-1.5 + c * 0.95, 0.85, 2.1);
+                    mainGroup.add(crate);
+                }
+                const roof = new THREE.Mesh(new THREE.ConeGeometry(3.6, 1.6, 4), sharedMats.terracotta);
+                roof.rotation.y = Math.PI / 4;
+                roof.position.y = 3.6;
+                roofGroup.add(roof);
+            } else if (type === 'barracks') {
+                const keep = new THREE.Mesh(new THREE.BoxGeometry(4.8, 3.0, 4.0), sharedMats.stone);
+                keep.position.y = 1.75;
+                keep.castShadow = true;
+                mainGroup.add(keep);
+                [[-2.2, -1.8], [2.2, -1.8], [-2.2, 1.8], [2.2, 1.8]].forEach(([tx, tz]) => {
+                    const tower = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.78, 4.2, 10), sharedMats.stone);
+                    tower.position.set(tx, 2.35, tz);
+                    tower.castShadow = true;
+                    mainGroup.add(tower);
+                    const tRoof = new THREE.Mesh(new THREE.ConeGeometry(0.88, 1.1, 10), sharedMats.terracotta);
+                    tRoof.position.set(tx, 4.95, tz);
+                    roofGroup.add(tRoof);
+                });
+            } else if (type === 'shrine') {
+                const podium = new THREE.Mesh(new THREE.CylinderGeometry(2.1, 2.4, 1.2, 16), sharedMats.marble);
+                podium.position.y = 0.85;
+                mainGroup.add(podium);
+                for (let c = 0; c < 8; c++) {
+                    const a = (Math.PI * 2 * c) / 8;
+                    const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.20, 0.24, 2.6, 10), sharedMats.marble);
+                    pillar.position.set(Math.cos(a) * 1.65, 2.65, Math.sin(a) * 1.65);
+                    mainGroup.add(pillar);
+                }
+                const dome = new THREE.Mesh(new THREE.SphereGeometry(1.75, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2), sharedMats.verdiDome);
+                dome.position.y = 3.95;
+                roofGroup.add(dome);
+            }
+
+            mainGroup.add(roofGroup);
+            root.add(mainGroup);
+
+            // 4. Multi-Stage Destruction FX Group: Flickering Fire Sprites, Rising Black Smoke & Half-Walls (sample1 & sample12)
+            const fireSmokeGroup = new THREE.Group();
+            const fireSprites = [];
+            for (let f = 0; f < 4; f++) {
+                const fs = new THREE.Sprite(new THREE.SpriteMaterial({ map: fireSpriteTex, blending: THREE.AdditiveBlending, transparent: true }));
+                fs.position.set((f - 1.5) * 0.9, 1.8 + (f % 2) * 0.8, (f % 2 === 0 ? 1 : -1) * 0.8);
+                fs.scale.set(2.2, 2.6, 1);
+                fireSmokeGroup.add(fs);
+                fireSprites.push(fs);
+            }
+            const smokeSprites = [];
+            for (let sm = 0; sm < 5; sm++) {
+                const ss = new THREE.Sprite(new THREE.SpriteMaterial({ map: smokeSpriteTex, transparent: true, opacity: 0.65 }));
+                ss.position.set((Math.random() - 0.5) * 1.8, 3.2 + sm * 1.1, (Math.random() - 0.5) * 1.8);
+                ss.scale.set(2.8 + sm * 0.5, 2.8 + sm * 0.5, 1);
+                ss.userData = { baseY: ss.position.y, offset: sm * 1.3 };
+                fireSmokeGroup.add(ss);
+                smokeSprites.push(ss);
+            }
+            fireSmokeGroup.visible = false;
+            root.add(fireSmokeGroup);
+
+            // 5. Destroyed Ruins & Jagged Broken Wall Stumps (sample12.png bottom-left!)
+            const rubbleGroup = new THREE.Group();
+            for (let r = 0; r < 8; r++) {
+                const a = (r / 8) * Math.PI * 2;
+                const stump = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.7 + (r % 3) * 0.45, 0.45), r % 2 === 0 ? sharedMats.charred : sharedMats.stone);
+                stump.position.set(Math.cos(a) * 1.75, 0.65, Math.sin(a) * 1.45);
+                stump.rotation.y = a + Math.PI / 2;
+                stump.rotation.z = (Math.random() - 0.5) * 0.25;
+                rubbleGroup.add(stump);
+            }
+            rubbleGroup.visible = false;
+            root.add(rubbleGroup);
+
+            const bObj = {
+                type,
+                mesh: root,
+                x, z,
+                buildProgress: isPrebuilt ? 100 : 8,
+                hp: 100,
+                maxHp: 100,
+                state: isPrebuilt ? 'complete' : 'constructing',
+                scaffoldGroup,
+                cranePivot,
+                mainGroup,
+                raftersGroup,
+                roofGroup,
+                fireSmokeGroup,
+                fireSprites,
+                smokeSprites,
+                rubbleGroup,
+                windmillSails
+            };
+
+            root.userData = { entityType: 'building', buildingRef: bObj };
+            updateBuildingVisualState(bObj);
+
+            scene.add(root);
+            createCobbleRoadTo(x, z);
+            buildings.push(bObj);
+            updateHUD();
+            return bObj;
+        }
+
+        function spawnDestructionDebris(x, y, z, count = 16) {
+            for (let i = 0; i < count; i++) {
+                const chunk = new THREE.Mesh(
+                    new THREE.DodecahedronGeometry(0.28 + Math.random() * 0.25, 0),
+                    i % 2 === 0 ? sharedMats.terracotta : sharedMats.charred
+                );
+                chunk.position.set(x + (Math.random() - 0.5) * 2.5, y + 1.5 + Math.random() * 2, z + (Math.random() - 0.5) * 2.5);
+                chunk.userData = {
+                    vx: (Math.random() - 0.5) * 9,
+                    vy: 4 + Math.random() * 7,
+                    vz: (Math.random() - 0.5) * 9,
+                    gravity: 16,
+                    life: 1.6 + Math.random() * 0.8
+                };
+                scene.add(chunk);
+                particles.push(chunk);
+            }
+        }
+
+        function updateBuildingVisualState(b) {
+            if (b.hp <= 0) {
+                if (b.state !== 'ruins') {
+                    spawnDestructionDebris(b.x, b.mesh.position.y, b.z, 24);
+                }
+                b.state = 'ruins';
+                b.mainGroup.visible = false;
+                b.scaffoldGroup.visible = false;
+                b.fireSmokeGroup.visible = true;
+                b.rubbleGroup.visible = true;
+                return;
+            }
+
+            if (b.buildProgress < 100) {
+                b.state = 'constructing';
+                b.scaffoldGroup.visible = true;
+                b.mainGroup.visible = true;
+                b.fireSmokeGroup.visible = false;
+                b.rubbleGroup.visible = false;
+
+                // Smooth staged vertical masonry rise + roof rafters before tiles!
+                const p = Math.max(0.12, b.buildProgress / 100);
+                b.mainGroup.scale.set(1, Math.min(1, p * 1.15), 1);
+                b.raftersGroup.visible = b.buildProgress >= 45 && b.buildProgress < 88;
+                b.roofGroup.visible = b.buildProgress >= 78;
+            } else {
+                b.mainGroup.visible = true;
+                b.mainGroup.scale.set(1, 1, 1);
+                if (b.hp < 40) {
+                    // Heavy Damage: Exposed charred rafters, missing tiled roof, raging fire & smoke!
+                    b.state = 'critical_damage';
+                    b.roofGroup.visible = false;
+                    b.raftersGroup.visible = true;
+                    b.scaffoldGroup.visible = false;
+                    b.fireSmokeGroup.visible = true;
+                    b.rubbleGroup.visible = true;
+                } else if (b.hp < 80) {
+                    // Moderate Damage: Roof intact, fires burning & smoke rising
+                    b.state = 'damaged';
+                    b.roofGroup.visible = true;
+                    b.raftersGroup.visible = false;
+                    b.scaffoldGroup.visible = false;
+                    b.fireSmokeGroup.visible = true;
+                    b.rubbleGroup.visible = false;
+                } else {
+                    // Pristine Completed Building
+                    b.state = 'complete';
+                    b.roofGroup.visible = true;
+                    b.raftersGroup.visible = false;
+                    b.scaffoldGroup.visible = false;
+                    b.fireSmokeGroup.visible = false;
+                    b.rubbleGroup.visible = false;
+                }
+            }
+        }
+
+        const ROLE_TUNICS = {
+            'Bauer': 0xd97706,
+            'Holzfäller': 0x15803d,
+            'Baumeister': 0x0284c7,
+            'Priester': 0xf8fafc,
+            'Bergarbeiter': 0x64748b
+        };
+
+        function spawnVillager(x, z, role = 'Bauer') {
+            const y = getTerrainHeight(x, z);
+            const vGroup = new THREE.Group();
+            vGroup.position.set(x, y, z);
+
+            const tunicColor = ROLE_TUNICS[role] || 0x0284c7;
+            const tunicMat = new THREE.MeshStandardMaterial({ color: tunicColor, roughness: 0.65 });
+
+            const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.24, 0.68, 10), tunicMat);
+            torso.position.y = 0.88;
+            torso.castShadow = true;
+            vGroup.add(torso);
+
+            const belt = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.23, 0.1, 10), sharedMats.timber);
+            belt.position.y = 0.68;
+            vGroup.add(belt);
+
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.20, 14, 14), sharedMats.skin);
+            head.position.y = 1.42;
+            head.castShadow = true;
+            vGroup.add(head);
+
+            const hair = new THREE.Mesh(new THREE.SphereGeometry(0.21, 12, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), sharedMats.hairDark);
+            hair.position.y = 1.45;
+            vGroup.add(hair);
+
+            const leftArmPivot = new THREE.Group();
+            leftArmPivot.position.set(-0.27, 1.15, 0);
+            const leftArm = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.055, 0.52, 8), sharedMats.skin);
+            leftArm.position.y = -0.24;
+            leftArmPivot.add(leftArm);
+            vGroup.add(leftArmPivot);
+
+            const rightArmPivot = new THREE.Group();
+            rightArmPivot.position.set(0.27, 1.15, 0);
+            const rightArm = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.055, 0.52, 8), sharedMats.skin);
+            rightArm.position.y = -0.24;
+            rightArmPivot.add(rightArm);
+
+            const toolHandle = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.65, 6), sharedMats.timber);
+            toolHandle.rotation.x = Math.PI / 2;
+            toolHandle.position.set(0, -0.46, 0.22);
+            const hammerHead = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.12, 0.24), sharedMats.stone);
+            hammerHead.position.set(0, -0.46, 0.52);
+            rightArmPivot.add(toolHandle, hammerHead);
+            vGroup.add(rightArmPivot);
+
+            const leftLegPivot = new THREE.Group();
+            leftLegPivot.position.set(-0.11, 0.56, 0);
+            const leftLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.065, 0.56, 8), sharedMats.skin);
+            leftLeg.position.y = -0.28;
+            leftLegPivot.add(leftLeg);
+            vGroup.add(leftLegPivot);
+
+            const rightLegPivot = new THREE.Group();
+            rightLegPivot.position.set(0.11, 0.56, 0);
+            const rightLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.065, 0.56, 8), sharedMats.skin);
+            rightLeg.position.y = -0.28;
+            rightLegPivot.add(rightLeg);
+            vGroup.add(rightLegPivot);
+
+            vGroup.userData = {
+                entityType: 'villager',
+                role,
+                tunicMat,
+                limbs: { leftArmPivot, rightArmPivot, leftLegPivot, rightLegPivot },
+                walkPhase: Math.random() * Math.PI * 2,
+                targetX: x + (Math.random() - 0.5) * 14,
+                targetZ: z + (Math.random() - 0.5) * 14,
+                timer: Math.random() * 4,
+                sparkTimer: 0
+            };
+            scene.add(vGroup);
+            villagers.push(vGroup);
+            return vGroup;
+        }
+
+        function setVillagerRole(v, newRole) {
+            v.userData.role = newRole;
+            if (v.userData.tunicMat) {
+                v.userData.tunicMat.color.setHex(ROLE_TUNICS[newRole] || 0x0284c7);
+            }
+        }
+
+        // Tiered Pine & Cypress Conifer Trees (Directly matching sample5.jpg & sample12.png!)
+        const treeFoliageMaterials = [
+            new THREE.MeshStandardMaterial({ color: 0x2d5a27, roughness: 0.82 }),
+            new THREE.MeshStandardMaterial({ color: 0x1e4620, roughness: 0.85 })
+        ];
+
+        function spawnEnvironmentNodes() {
+            for (let i = 0; i < 105; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const radius = 26 + Math.random() * 98;
+                const tx = Math.cos(angle) * radius;
+                const tz = Math.sin(angle) * radius;
+                const ty = getTerrainHeight(tx, tz);
+                if (ty < 1.2 || ty > 15.5) continue;
+
+                const treeGroup = new THREE.Group();
+                treeGroup.position.set(tx, ty, tz);
+
+                const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.34, 2.4, 8), sharedMats.timber);
+                trunk.position.y = 1.2;
+                trunk.castShadow = true;
+                treeGroup.add(trunk);
+
+                const mat = treeFoliageMaterials[i % 2];
+                // 4-tiered overlapping conifer boughs like the pine trees in sample5.jpg & sample8.jpg
+                for (let layer = 0; layer < 4; layer++) {
+                    const coneR = 1.75 - layer * 0.34;
+                    const coneH = 1.85 - layer * 0.18;
+                    const bough = new THREE.Mesh(new THREE.ConeGeometry(coneR, coneH, 9), mat);
+                    bough.position.y = 2.1 + layer * 1.05;
+                    bough.rotation.y = layer * 0.5;
+                    bough.castShadow = true;
+                    treeGroup.add(bough);
+                }
+
+                const s = 0.85 + Math.random() * 0.45;
+                treeGroup.scale.setScalar(s);
+                treeGroup.userData = { entityType: 'resource', resType: 'wood', amount: 45 };
+                scene.add(treeGroup);
+                resourcesNodes.push(treeGroup);
+            }
+
+            for (let i = 0; i < 24; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const radius = 24 + Math.random() * 88;
+                const ox = Math.cos(angle) * radius;
+                const oz = Math.sin(angle) * radius;
+                const oy = getTerrainHeight(ox, oz);
+                if (oy < 1.5) continue;
+
+                const veinGroup = new THREE.Group();
+                veinGroup.position.set(ox, oy, oz);
+
+                const baseRock = new THREE.Mesh(new THREE.DodecahedronGeometry(1.35, 1), sharedMats.stone);
+                baseRock.scale.set(1.2, 0.75, 1.1);
+                baseRock.position.y = 0.55;
+                baseRock.castShadow = true;
+                veinGroup.add(baseRock);
+
+                for (let k = 0; k < 4; k++) {
+                    const shard = new THREE.Mesh(new THREE.OctahedronGeometry(0.48, 0), sharedMats.goldTrim);
+                    shard.position.set((Math.random() - 0.5) * 1.2, 0.9 + Math.random() * 0.35, (Math.random() - 0.5) * 1.2);
+                    veinGroup.add(shard);
+                }
+
+                veinGroup.userData = { entityType: 'resource', resType: 'ore', amount: 70 };
+                scene.add(veinGroup);
+                resourcesNodes.push(veinGroup);
+            }
+        }
+        spawnEnvironmentNodes();
+
+        // Rival Tribe Capitals with B&W2 War Banners (sample1.jpg left!)
+        function buildTribeCapitals() {
+            const vPos = state.tribes.vikings.pos;
+            vPos.y = getTerrainHeight(vPos.x, vPos.z);
+            const vGroup = new THREE.Group();
+            vGroup.position.copy(vPos);
+            const longhall = new THREE.Mesh(new THREE.BoxGeometry(9.5, 4.0, 5.5), sharedMats.timber);
+            longhall.position.y = 2.0;
+            const vRoof = new THREE.Mesh(new THREE.ConeGeometry(6.8, 3.0, 4), sharedMats.scaffold);
+            vRoof.rotation.y = Math.PI / 4;
+            vRoof.position.y = 5.5;
+            vGroup.add(longhall, vRoof);
+            scene.add(vGroup);
+
+            const jPos = state.tribes.japanese.pos;
+            jPos.y = getTerrainHeight(jPos.x, jPos.z);
+            const jGroup = new THREE.Group();
+            jGroup.position.copy(jPos);
+            for (let tier = 0; tier < 3; tier++) {
+                const b = new THREE.Mesh(new THREE.BoxGeometry(7 - tier * 1.6, 2.0, 7 - tier * 1.6), sharedMats.facade);
+                b.position.y = tier * 2.2 + 1.0;
+                const r = new THREE.Mesh(new THREE.ConeGeometry(5.8 - tier * 1.2, 1.1, 4), sharedMats.verdiDome);
+                r.rotation.y = Math.PI / 4;
+                r.position.y = tier * 2.2 + 2.4;
+                jGroup.add(b, r);
+            }
+            scene.add(jGroup);
+
+            const aPos = state.tribes.aztecs.pos;
+            aPos.y = getTerrainHeight(aPos.x, aPos.z);
+            const aGroup = new THREE.Group();
+            aGroup.position.copy(aPos);
+            for (let s = 0; s < 4; s++) {
+                const step = new THREE.Mesh(new THREE.BoxGeometry(12 - s * 2.4, 1.8, 12 - s * 2.4), sharedMats.stone);
+                step.position.y = s * 1.8 + 0.9;
+                aGroup.add(step);
+            }
+            scene.add(aGroup);
+        }
+        buildTribeCapitals();
+
+        // ============================================================================
+        // 7. HIGH-DETAIL BIPEDAL B&W2 CREATURE TITAN (Modeled after sample1.jpg & sample5.jpg)
+        //    Features procedural fur textures, digitigrade hind legs, 4-clawed paws,
+        //    muscular pectorals/abdomen, layered mane, articulated jaw, and rich animations
+        // ============================================================================
+        function buildDetailedCreatureFromSlot(slotIndex = state.activeSlotIndex) {
+            state.activeSlotIndex = slotIndex;
+            const cfg = state.creatureSlots[slotIndex] || state.creatureSlots[0];
+
+            const prevPos = state.creature.mesh ? state.creature.mesh.position.clone() : new THREE.Vector3(14, getTerrainHeight(14, 10), 10);
+            if (state.creature.mesh) scene.remove(state.creature.mesh);
+
+            const root = new THREE.Group();
+            const furTex = AssetForge.createFurTexture(cfg.color1, cfg.color2, cfg.species === 'tiger');
+            const maneTex = AssetForge.createFurTexture(cfg.color2, cfg.color1, false);
+
+            const furMat = new THREE.MeshStandardMaterial({ map: furTex, roughness: 0.68 });
+            const secMat = new THREE.MeshStandardMaterial({ map: maneTex, roughness: 0.76 });
+            const bellyMat = new THREE.MeshStandardMaterial({ color: 0xdccbb8, roughness: 0.72 });
+            const clawMat = new THREE.MeshStandardMaterial({ color: 0x141416, roughness: 0.35, metalness: 0.2 });
+            const eyeMat = new THREE.MeshBasicMaterial({ color: cfg.eyeColor });
+            const armorMat = cfg.armor === 'gold'
+                ? sharedMats.goldTrim
+                : new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.75, roughness: 0.25 });
+
+            const mScale = parseFloat(cfg.muscle) || 1.1;
+            const totalScale = parseFloat(cfg.scale) || 1.1;
+
+            // Pelvis / Hip Root (Enables realistic vertical bobbing & hip sway during bipedal stride)
+            const pelvisGroup = new THREE.Group();
+            pelvisGroup.position.set(0, 3.1, 0);
+            root.add(pelvisGroup);
+
+            const hipsMesh = new THREE.Mesh(new THREE.SphereGeometry(1.18 * mScale, 18, 16), furMat);
+            hipsMesh.scale.set(1.05, 0.85, 0.95);
+            hipsMesh.castShadow = true;
+            pelvisGroup.add(hipsMesh);
+
+            // Spine & Muscular Torso Group (Slightly hunched forward for Ape, proud upright for Lion)
+            const spineGroup = new THREE.Group();
+            spineGroup.position.set(0, 0.55, 0);
+            pelvisGroup.add(spineGroup);
+
+            const abdomen = new THREE.Mesh(new THREE.CylinderGeometry(1.22 * mScale, 1.02 * mScale, 1.85, 18), furMat);
+            abdomen.position.set(0, 0.9, 0.05);
+            abdomen.castShadow = true;
+            spineGroup.add(abdomen);
+
+            // Lighter chest/stomach fur patch (Directly visible on the Lion in sample5.jpg!)
+            const bellyPatch = new THREE.Mesh(new THREE.SphereGeometry(1.02 * mScale, 16, 14), bellyMat);
+            bellyPatch.scale.set(0.78, 1.35, 0.48);
+            bellyPatch.position.set(0, 1.45, 0.76 * mScale);
+            spineGroup.add(bellyPatch);
+
+            // Broad Muscular Pectorals & Ribcage
+            const chest = new THREE.Mesh(new THREE.SphereGeometry(1.56 * mScale, 20, 18), furMat);
+            chest.scale.set(1.14, 1.08, 0.95);
+            chest.position.set(0, 2.35, 0.18);
+            chest.castShadow = true;
+            spineGroup.add(chest);
+
+            // Multi-layered Sculpted Lion Mane / Gorilla Silverback Shoulders (sample5.jpg & sample1.jpg)
+            if (cfg.species === 'lion') {
+                for (let m = 0; m < 3; m++) {
+                    const maneRing = new THREE.Mesh(new THREE.DodecahedronGeometry((1.75 - m * 0.14) * mScale, 2), secMat);
+                    maneRing.scale.set(1.08, 1.15, 1.05);
+                    maneRing.position.set(0, 3.05 + m * 0.45, -0.05 + m * 0.12);
+                    maneRing.castShadow = true;
+                    spineGroup.add(maneRing);
+                }
+            } else if (cfg.species === 'ape') {
+                const humps = new THREE.Mesh(new THREE.SphereGeometry(1.48 * mScale, 16, 14), secMat);
+                humps.scale.set(1.25, 0.85, 1.0);
+                humps.position.set(0, 3.0, -0.15);
+                spineGroup.add(humps);
+            }
+
+            // Sculpted Expressive Head with Brow Ridge, Snout, Hinged Lower Jaw, Fangs & Ears
+            const headGroup = new THREE.Group();
+            headGroup.position.set(0, 3.85, 0.55);
+            spineGroup.add(headGroup);
+
+            const cranium = new THREE.Mesh(new THREE.SphereGeometry(1.02, 18, 18), furMat);
+            cranium.scale.set(1.0, 1.05, 1.08);
+            cranium.castShadow = true;
+            headGroup.add(cranium);
+
+            // Heavy Brow Ridge (gives fierce/expressive B&W2 look from sample1 & sample5)
+            const brow = new THREE.Mesh(new THREE.BoxGeometry(1.22, 0.28, 0.65), furMat);
+            brow.position.set(0, 0.36, 0.72);
+            brow.rotation.x = 0.15;
+            headGroup.add(brow);
+
+            // Upper Muzzle / Snout
+            const snoutLen = cfg.species === 'ape' ? 0.65 : 1.05;
+            const snout = new THREE.Mesh(new THREE.SphereGeometry(0.62, 16, 14), furMat);
+            snout.scale.set(0.95, 0.72, snoutLen * 1.3);
+            snout.position.set(0, -0.12, 0.75);
+            headGroup.add(snout);
+
+            const nose = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 12), clawMat);
+            nose.scale.set(1.2, 0.85, 0.85);
+            nose.position.set(0, 0.04, 0.75 + snoutLen * 0.72);
+            headGroup.add(nose);
+
+            // Hinged Lower Jaw + Canine Fangs (Animates during roaring & eating!)
+            const jawPivot = new THREE.Group();
+            jawPivot.position.set(0, -0.36, 0.35);
+            const lowerJaw = new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.28, snoutLen * 1.15), secMat);
+            lowerJaw.position.set(0, -0.05, snoutLen * 0.45);
+            const fangL = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.28, 6), sharedMats.marble);
+            fangL.position.set(-0.26, 0.16, snoutLen * 0.82);
+            const fangR = fangL.clone();
+            fangR.position.x = 0.26;
+            jawPivot.add(lowerJaw, fangL, fangR);
+            headGroup.add(jawPivot);
+
+            // Ears
+            const earL = new THREE.Mesh(new THREE.SphereGeometry(0.28, 10, 10), secMat);
+            earL.scale.set(0.6, 1.2, 0.4);
+            earL.position.set(-0.78, 0.72, -0.05);
+            const earR = earL.clone();
+            earR.position.x = 0.78;
+            headGroup.add(earL, earR);
+
+            // Expressive Eyes with Dark Pupils
+            const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 12), eyeMat);
+            eyeL.position.set(-0.36, 0.18, 0.88);
+            const pupilL = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 8), clawMat);
+            pupilL.position.set(-0.36, 0.18, 1.0);
+            const eyeR = eyeL.clone(); eyeR.position.x = 0.36;
+            const pupilR = pupilL.clone(); pupilR.position.x = 0.36;
+            headGroup.add(eyeL, pupilL, eyeR, pupilR);
+
+            // Optional Horns
+            if (cfg.horns === 'curved' || cfg.species === 'cow') {
+                const hornGeo = new THREE.ConeGeometry(0.24, 1.55, 10);
+                const hornL = new THREE.Mesh(hornGeo, sharedMats.marble);
+                hornL.position.set(-0.92, 0.68, 0.05);
+                hornL.rotation.z = 0.92;
+                const hornR = hornL.clone();
+                hornR.position.x = 0.92;
+                hornR.rotation.z = -0.92;
+                headGroup.add(hornL, hornR);
+            } else if (cfg.horns === 'crown') {
+                for (let k = 0; k < 5; k++) {
+                    const spike = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.8, 6), sharedMats.goldTrim);
+                    const a = (k - 2) * 0.45;
+                    spike.position.set(Math.sin(a) * 0.75, 0.95, Math.cos(a) * 0.35);
+                    headGroup.add(spike);
+                }
+            }
+
+            // Articulated Two-Jointed Muscular Arms (Shoulder -> Upper Arm -> Elbow Pivot -> Forearm -> Clawed Hand)
+            function createTitanArm(isLeft) {
+                const dir = isLeft ? -1 : 1;
+                const shoulderPivot = new THREE.Group();
+                shoulderPivot.position.set(dir * 1.72 * mScale, 2.75, 0.15);
+
+                const deltoid = new THREE.Mesh(new THREE.SphereGeometry(0.58 * mScale, 14, 14), furMat);
+                shoulderPivot.add(deltoid);
+
+                const upperArm = new THREE.Mesh(new THREE.CylinderGeometry(0.48 * mScale, 0.40 * mScale, 1.65, 14), furMat);
+                upperArm.position.y = -0.82;
+                upperArm.castShadow = true;
+                shoulderPivot.add(upperArm);
+
+                const elbowPivot = new THREE.Group();
+                elbowPivot.position.set(0, -1.65, 0);
+                shoulderPivot.add(elbowPivot);
+
+                const elbowSphere = new THREE.Mesh(new THREE.SphereGeometry(0.40 * mScale, 12, 12), furMat);
+                elbowPivot.add(elbowSphere);
+
+                const forearm = new THREE.Mesh(new THREE.CylinderGeometry(0.42 * mScale, 0.36 * mScale, 1.55, 14), furMat);
+                forearm.position.set(0, -0.78, 0.12);
+                forearm.rotation.x = -0.15;
+                forearm.castShadow = true;
+                elbowPivot.add(forearm);
+
+                // Hand Paw with 4 Curved Black Claws (Directly like sample5.jpg!)
+                const pawHand = new THREE.Mesh(new THREE.SphereGeometry(0.46 * mScale, 12, 12), bellyMat);
+                pawHand.scale.set(0.95, 0.75, 1.15);
+                pawHand.position.set(0, -1.55, 0.25);
+                elbowPivot.add(pawHand);
+
+                for (let c = 0; c < 4; c++) {
+                    const claw = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.42, 6), clawMat);
+                    claw.rotation.x = Math.PI * 0.72;
+                    claw.position.set((c - 1.5) * 0.18, -1.78, 0.58);
+                    elbowPivot.add(claw);
+                }
+
+                if (cfg.armor !== 'none') {
+                    const pauldron = new THREE.Mesh(new THREE.SphereGeometry(0.74 * mScale, 14, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), armorMat);
+                    pauldron.position.y = 0.18;
+                    shoulderPivot.add(pauldron);
+                }
+
+                spineGroup.add(shoulderPivot);
+                return { shoulderPivot, elbowPivot };
+            }
+
+            const leftArm = createTitanArm(true);
+            const rightArm = createTitanArm(false);
+
+            if (cfg.armor !== 'none') {
+                const chestPlate = new THREE.Mesh(new THREE.BoxGeometry(2.2 * mScale, 1.45, 0.5), armorMat);
+                chestPlate.position.set(0, 2.35, 1.18 * mScale);
+                spineGroup.add(chestPlate);
+            }
+
+            // Articulated Digitigrade Hind Legs (Hip -> Thigh -> Knee Pivot -> Calf -> Heavy 4-Clawed Foot)
+            // Modeled directly after the upright Lion legs & paws in sample5.jpg!
+            function createTitanLeg(isLeft) {
+                const dir = isLeft ? -1 : 1;
+                const hipPivot = new THREE.Group();
+                hipPivot.position.set(dir * 0.88 * mScale, 0, 0);
+
+                const thigh = new THREE.Mesh(new THREE.CylinderGeometry(0.62 * mScale, 0.46 * mScale, 1.65, 14), furMat);
+                thigh.position.set(0, -0.78, 0.18);
+                thigh.rotation.x = -0.22;
+                thigh.castShadow = true;
+                hipPivot.add(thigh);
+
+                const kneePivot = new THREE.Group();
+                kneePivot.position.set(0, -1.55, 0.35);
+                hipPivot.add(kneePivot);
+
+                const kneeJoint = new THREE.Mesh(new THREE.SphereGeometry(0.45 * mScale, 12, 12), furMat);
+                kneePivot.add(kneeJoint);
+
+                const calf = new THREE.Mesh(new THREE.CylinderGeometry(0.44 * mScale, 0.36 * mScale, 1.45, 14), furMat);
+                calf.position.set(0, -0.68, -0.18);
+                calf.rotation.x = 0.25;
+                calf.castShadow = true;
+                kneePivot.add(calf);
+
+                // Heavy Digitigrade Foot with 4 Toes & Black Claws (sample5.jpg!)
+                const footGroup = new THREE.Group();
+                footGroup.position.set(0, -1.42, 0.15);
+                const footBase = new THREE.Mesh(new THREE.SphereGeometry(0.58 * mScale, 14, 12), furMat);
+                footBase.scale.set(0.95, 0.48, 1.45);
+                footBase.castShadow = true;
+                footGroup.add(footBase);
+
+                for (let t = 0; t < 4; t++) {
+                    const tx = (t - 1.5) * 0.24 * mScale;
+                    const toe = new THREE.Mesh(new THREE.SphereGeometry(0.18, 10, 10), bellyMat);
+                    toe.position.set(tx, -0.05, 0.68 * mScale);
+                    const claw = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.38, 6), clawMat);
+                    claw.rotation.x = Math.PI / 2.1;
+                    claw.position.set(tx, -0.08, 0.96 * mScale);
+                    footGroup.add(toe, claw);
+                }
+                kneePivot.add(footGroup);
+                pelvisGroup.add(hipPivot);
+                return { hipPivot, kneePivot };
+            }
+
+            const leftLeg = createTitanLeg(true);
+            const rightLeg = createTitanLeg(false);
+
+            // Multi-Segment Tufted Tail (Matches the Lion tail in sample5.jpg!)
+            const tailPivot = new THREE.Group();
+            tailPivot.position.set(0, -0.1, -0.85);
+            const tailSeg1 = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.22, 1.6, 10), furMat);
+            tailSeg1.rotation.x = -1.1;
+            tailSeg1.position.set(0, -0.35, -0.7);
+            const tailSeg2 = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 1.5, 10), furMat);
+            tailSeg2.rotation.x = -0.45;
+            tailSeg2.position.set(0, -0.55, -1.85);
+            const tailTuft = new THREE.Mesh(new THREE.DodecahedronGeometry(0.38, 1), secMat);
+            tailTuft.position.set(0, -0.25, -2.55);
+            tailPivot.add(tailSeg1, tailSeg2, tailTuft);
+            pelvisGroup.add(tailPivot);
+
+            root.scale.setScalar(totalScale);
+            root.position.copy(prevPos);
+            root.position.y = getTerrainHeight(root.position.x, root.position.z);
+            scene.add(root);
+
+            state.creature.mesh = root;
+            state.creature.joints = {
+                pelvisGroup,
+                spineGroup,
+                headGroup,
+                jawPivot,
+                leftArm,
+                rightArm,
+                leftLeg,
+                rightLeg,
+                tailPivot
+            };
+            renderCreatureSlotBars();
+            updateHUD();
+        }
+<!-- ... existing code ... -->
+        // Update Articulated Bipedal Creature AI & Full-Body Kinematic Animations
+        let creatureDecisionTimer = 0;
+        function updateCreatureAI(dt, now) {
+            const c = state.creature;
+            if (!c.mesh) return;
+
+            creatureDecisionTimer -= dt;
+            if (creatureDecisionTimer <= 0) {
+                creatureDecisionTimer = 4.6;
+                c.hunger = Math.min(100, c.hunger + 1.0);
+
+                const needyBuilding = buildings.find(b => b.buildProgress < 100 || (b.hp < b.maxHp && b.hp > 0));
+                if ((c.role === 'builder' || c.role === 'free') && needyBuilding) {
+                    c.targetPos.set(needyBuilding.x + 3.4, 0, needyBuilding.z + 3.2);
+                    c.stateText = 'Baut & repariert Bauwerk';
+                    c.animMode = 'work';
+                    c.animTimer = 3.2;
+                    needyBuilding.buildProgress = Math.min(100, needyBuilding.buildProgress + 24);
+                    needyBuilding.hp = Math.min(needyBuilding.maxHp, needyBuilding.hp + 22);
+                    updateBuildingVisualState(needyBuilding);
+                    addFaith(5);
+                } else if (c.role === 'gather') {
+                    c.stateText = 'Sammelt Holz & Korn für dein Lager';
+                    c.animMode = 'work';
+                    state.resources.wood += 6;
+                    state.resources.food += 6;
+                } else if (c.role === 'entertain') {
+                    c.stateText = 'Begeistert deine Siedler (+Glaube)';
+                    c.animMode = 'roar';
+                    c.animTimer = 2.5;
+                    addFaith(7);
+                } else if (c.role === 'soldier') {
+                    c.stateText = 'Brüllt & bewacht die Reichsgrenzen';
+                    c.animMode = 'roar';
+                    c.animTimer = 2.5;
+                    state.tribes.vikings.impress = Math.min(100, state.tribes.vikings.impress + 2);
+                } else {
+                    c.stateText = 'Denkt nach & wacht über die Polis';
+                    c.animMode = Math.random() < 0.65 ? 'think' : 'roar';
+                    c.animTimer = 3.5;
+                    addFaith(2);
+                }
+
+                if (!needyBuilding || c.role !== 'builder') {
+                    if (Math.random() < 0.6) {
+                        const angle = Math.random() * Math.PI * 2;
+                        const dist = 12 + Math.random() * (EPOCHS[state.epochIndex].influenceRadius * 0.48);
+                        c.targetPos.set(Math.cos(angle) * dist, 0, Math.sin(angle) * dist);
+                    }
+                }
+                updateHUD();
+            }
+
+            const dx = c.targetPos.x - c.mesh.position.x;
+            const dz = c.targetPos.z - c.mesh.position.z;
+            const dist = Math.hypot(dx, dz);
+            const j = c.joints;
+            if (!j || !j.pelvisGroup) return;
+
+            if (dist > 0.85) {
+                // Full Bipedal Stride Animation (Pelvis bob, Knee flexion, Arm counter-swing, Spine twist)
+                const speed = 6.4 * dt;
+                c.mesh.position.x += (dx / dist) * speed;
+                c.mesh.position.z += (dz / dist) * speed;
+
+                // Smooth yaw turn
+                const targetYaw = Math.atan2(dx, dz);
+                let diff = targetYaw - c.mesh.rotation.y;
+                while (diff > Math.PI) diff -= Math.PI * 2;
+                while (diff < -Math.PI) diff += Math.PI * 2;
+                c.mesh.rotation.y += diff * Math.min(1, dt * 7);
+
+                c.walkPhase += dt * 6.8;
+                const s = Math.sin(c.walkPhase);
+                const cWave = Math.cos(c.walkPhase);
+
+                j.pelvisGroup.position.y = 3.1 + Math.abs(s) * 0.26;
+                j.pelvisGroup.rotation.z = cWave * 0.06;
+                j.spineGroup.rotation.x = 0.14; // Forward stride lean
+                j.spineGroup.rotation.y = -s * 0.12;
+
+                j.leftLeg.hipPivot.rotation.x = s * 0.58;
+                j.leftLeg.kneePivot.rotation.x = Math.max(0, -cWave * 0.65);
+                j.rightLeg.hipPivot.rotation.x = -s * 0.58;
+                j.rightLeg.kneePivot.rotation.x = Math.max(0, cWave * 0.65);
+
+                j.leftArm.shoulderPivot.rotation.x = -s * 0.45;
+                j.leftArm.elbowPivot.rotation.x = -0.35 - Math.max(0, s * 0.35);
+                j.rightArm.shoulderPivot.rotation.x = s * 0.45;
+                j.rightArm.elbowPivot.rotation.x = -0.35 - Math.max(0, -s * 0.35);
+                j.jawPivot.rotation.x = 0.05;
+            } else {
+                // Stationary Emotes: 'think' (Chin-Stroke like sample5.jpg!), 'roar' (Chest-Beat like sample1.jpg!), or 'work'
+                j.leftLeg.hipPivot.rotation.x *= 0.85;
+                j.leftLeg.kneePivot.rotation.x *= 0.85;
+                j.rightLeg.hipPivot.rotation.x *= 0.85;
+                j.rightLeg.kneePivot.rotation.x *= 0.85;
+                j.pelvisGroup.position.y = 3.1 + Math.sin(now * 0.003) * 0.06;
+                j.pelvisGroup.rotation.z = 0;
+
+                if (c.animMode === 'think') {
+                    // Iconic B&W2 Lion Pose from sample5.jpg: Hand raised stroking chin thoughtfully!
+                    j.spineGroup.rotation.x = 0.08;
+                    j.rightArm.shoulderPivot.rotation.x = -1.15;
+                    j.rightArm.shoulderPivot.rotation.z = -0.25;
+                    j.rightArm.elbowPivot.rotation.x = -1.45 + Math.sin(now * 0.005) * 0.12;
+                    j.leftArm.shoulderPivot.rotation.x = 0.15;
+                    j.leftArm.elbowPivot.rotation.x = -0.35;
+                    j.headGroup.rotation.x = 0.14 + Math.sin(now * 0.003) * 0.05;
+                    j.jawPivot.rotation.x = 0.04;
+                } else if (c.animMode === 'roar') {
+                    // Iconic B&W2 Gorilla/Titan Roar from sample1.jpg: Arms wide / chest beat + open jaw!
+                    const beat = Math.sin(now * 0.014);
+                    j.spineGroup.rotation.x = -0.12;
+                    j.leftArm.shoulderPivot.rotation.x = -0.85 + beat * 0.35;
+                    j.leftArm.elbowPivot.rotation.x = -0.9;
+                    j.rightArm.shoulderPivot.rotation.x = -0.85 - beat * 0.35;
+                    j.rightArm.elbowPivot.rotation.x = -0.9;
+                    j.jawPivot.rotation.x = 0.42 + Math.abs(beat) * 0.22;
+                } else if (c.animMode === 'work') {
+                    // Heavy rhythmic building/hammering motion
+                    const swing = Math.sin(now * 0.012);
+                    j.spineGroup.rotation.x = 0.22 + swing * 0.12;
+                    j.rightArm.shoulderPivot.rotation.x = -0.9 + swing * 0.65;
+                    j.rightArm.elbowPivot.rotation.x = -0.6;
+                    j.leftArm.shoulderPivot.rotation.x = -0.7 - swing * 0.45;
+                    j.leftArm.elbowPivot.rotation.x = -0.6;
+                }
+            }
+
+            if (j.tailPivot) {
+                j.tailPivot.rotation.z = Math.sin(now * 0.0042) * 0.32;
+                j.tailPivot.rotation.x = Math.cos(now * 0.0028) * 0.14;
+            }
+            if (j.headGroup) {
+                j.headGroup.rotation.y = Math.sin(now * 0.0022) * 0.22;
+            }
+
+            c.mesh.position.y = getTerrainHeight(c.mesh.position.x, c.mesh.position.z);
+        }
+<!-- ... existing code ... -->
+            // Temple Beacon & Animated Construction Cranes / Fire & Smoke Plumes
+            const crystal = templeGroup.getObjectByName('manaCrystal');
+            if (crystal) {
+                crystal.rotation.y += rawDt * 0.8;
+            }
+            buildings.forEach(b => {
+                if (b.windmillSails && b.state !== 'ruins') {
+                    b.windmillSails.rotation.z += rawDt * 1.2;
+                }
+                if (b.state === 'constructing' && b.cranePivot) {
+                    b.cranePivot.rotation.y = Math.sin(now * 0.0015 + b.x) * 0.85;
+                }
+                if (b.fireSmokeGroup && b.fireSmokeGroup.visible) {
+                    b.fireSprites.forEach((fs, idx) => {
+                        const flicker = 2.0 + Math.sin(now * 0.018 + idx * 1.7) * 0.45;
+                        fs.scale.set(flicker, flicker * 1.25, 1);
+                    });
+                    b.smokeSprites.forEach((ss) => {
+                        ss.position.y += rawDt * 1.8;
+                        if (ss.position.y > 9.5) ss.position.y = 2.8;
+                    });
+                }
+            });
+
+            // Animate Articulated Human Villagers & Builder Construction Sparks
+            villagers.forEach(v => {
+                if (state.heldObject === v) return;
+                v.userData.timer -= dt;
+
+                const unfinished = buildings.find(b => b.buildProgress < 100 || (b.hp < b.maxHp && b.hp > 0));
+                if (v.userData.role === 'Baumeister' && unfinished) {
+                    v.userData.targetX = unfinished.x + 2.1;
+                    v.userData.targetZ = unfinished.z + 2.1;
+                } else if (v.userData.timer <= 0) {
+                    v.userData.timer = 4 + Math.random() * 5;
+                    const r = 7 + Math.random() * 22;
+                    const a = Math.random() * Math.PI * 2;
+                    v.userData.targetX = Math.cos(a) * r;
+                    v.userData.targetZ = Math.sin(a) * r;
+                }
+
+                const dx = v.userData.targetX - v.position.x;
+                const dz = v.userData.targetZ - v.position.z;
+                const d = Math.hypot(dx, dz);
+                const limbs = v.userData.limbs;
+
+                if (d > 0.45) {
+                    v.position.x += (dx / d) * 3.1 * dt;
+                    v.position.z += (dz / d) * 3.1 * dt;
+                    v.position.y = getTerrainHeight(v.position.x, v.position.z);
+                    v.rotation.y = Math.atan2(dx, dz);
+
+                    v.userData.walkPhase += dt * 9.0;
+                    if (limbs) {
+                        limbs.leftLegPivot.rotation.x = Math.sin(v.userData.walkPhase) * 0.6;
+                        limbs.rightLegPivot.rotation.x = -Math.sin(v.userData.walkPhase) * 0.6;
+                        limbs.leftArmPivot.rotation.x = -Math.sin(v.userData.walkPhase) * 0.5;
+                        limbs.rightArmPivot.rotation.x = Math.sin(v.userData.walkPhase) * 0.5;
+                    }
+                } else if (limbs) {
+                    limbs.leftLegPivot.rotation.x *= 0.85;
+                    limbs.rightLegPivot.rotation.x *= 0.85;
+                    limbs.rightArmPivot.rotation.x = -0.65 + Math.sin(now * 0.014) * 0.62;
+                    if (unfinished && Math.hypot(unfinished.x - v.position.x, unfinished.z - v.position.z) < 4.8) {
+                        unfinished.buildProgress = Math.min(100, unfinished.buildProgress + dt * 5.8);
+                        unfinished.hp = Math.min(unfinished.maxHp, unfinished.hp + dt * 3.8);
+                        updateBuildingVisualState(unfinished);
+
+                        // Spawn flying construction woodchips/sparks while hammering!
+                        v.userData.sparkTimer = (v.userData.sparkTimer || 0) - rawDt;
+                        if (v.userData.sparkTimer <= 0) {
+                            v.userData.sparkTimer = 0.45;
+                            spawnMiracleParticles(v.position, 0xfde047, 2);
+                        }
+                    }
+                }
+            });
+
+            economyAccumulator += dt;
+            if (economyAccumulator >= 2.8) {
+                economyAccumulator = 0;
+                const seasonMult = SEASONS[state.time.seasonIndex].foodMult;
+                state.resources.food += 3 * seasonMult;
+                state.resources.wood += 2;
+                state.resources.mana = Math.min(999, state.resources.mana + 4);
+                addFaith(1.4);
+                if (villagers.length < state.resources.maxPop && state.resources.food > 90 && Math.random() < 0.3) {
+                    spawnVillager((Math.random() - 0.5) * 14, (Math.random() - 0.5) * 14, 'Bauer');
+                }
+                updateHUD();
+            }
+
+            updateCreatureAI(dt, now);
+
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                if (p.userData.vx !== undefined) {
+                    p.position.x += p.userData.vx * rawDt;
+                    p.position.z += p.userData.vz * rawDt;
+                    p.userData.vy -= (p.userData.gravity || 12) * rawDt;
+                }
+                p.position.y += p.userData.vy * rawDt;
+                const floorY = getTerrainHeight(p.position.x, p.position.z);
+                if (p.position.y < floorY + 0.15 && p.userData.gravity) {
+                    p.position.y = floorY + 0.15;
+                    p.userData.vy *= -0.35;
+                    p.userData.vx *= 0.6;
+                    p.userData.vz *= 0.6;
+                }
+                p.userData.life -= rawDt;
+                if (p.userData.life <= 0) {
+                    scene.remove(p);
+                    particles.splice(i, 1);
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        window.onload = function() {
+            renderCreatureSlotBars();
+            updateHUD();
+            requestAnimationFrame(animate);
+        };
+    </script>
+</body>
+</html>

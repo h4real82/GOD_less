@@ -1,0 +1,3460 @@
+<!DOCTYPE html>
+<html lang="de" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GOD:less — Divine Strategy & Creature Simulation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <script>
+        window.tiltCard3D = function(e, cardEl) {
+            if (!cardEl) return;
+            const rect = cardEl.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            const cx = rect.width / 2;
+            const cy = rect.height / 2;
+            const rotX = ((y - cy) / cy) * -9;
+            const rotY = ((x - cx) / cx) * 9;
+            cardEl.style.transform = `perspective(1100px) rotateX(${rotX.toFixed(2)}deg) rotateY(${rotY.toFixed(2)}deg) translateY(-6px) scale(1.015)`;
+        };
+
+        window.resetCard3D = function(cardEl) {
+            if (!cardEl) return;
+            cardEl.style.transform = 'perspective(1100px) rotateX(0deg) rotateY(0deg) translateY(0px) scale(1)';
+        };
+
+        window.scrollModeCards = function(dir) {
+            const scroller = document.getElementById('godless-scroller');
+            if (scroller) {
+                scroller.scrollBy({ left: dir * 350, behavior: 'smooth' });
+            }
+        };
+    </script>
+
+    <style>
+        * {
+            user-select: none;
+            -webkit-user-select: none;
+            box-sizing: border-box;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #060911;
+            font-family: 'Inter', sans-serif;
+            color: #f8fafc;
+        }
+        .font-cinzel {
+            font-family: 'Cinzel', serif;
+        }
+        #webgl-container {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+        #gesture-canvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 15;
+            pointer-events: none;
+        }
+        #lightning-fx-canvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 42;
+            pointer-events: none;
+        }
+        .aoe-panel {
+            background: linear-gradient(180deg, rgba(15, 23, 42, 0.90) 0%, rgba(9, 13, 24, 0.95) 100%);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid rgba(212, 175, 55, 0.36);
+            box-shadow: 0 14px 36px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 235, 160, 0.18);
+        }
+        .godless-title-glow {
+            text-shadow: 0 0 28px rgba(245, 158, 11, 0.55), 0 0 65px rgba(56, 189, 248, 0.35), 0 6px 18px rgba(0, 0, 0, 0.95);
+        }
+        .godless-card {
+            transition: transform 0.16s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.25s ease, box-shadow 0.25s ease;
+            transform-style: preserve-3d;
+        }
+        .godless-card:hover {
+            border-color: rgba(251, 191, 36, 0.78);
+            box-shadow: 0 22px 48px rgba(0, 0, 0, 0.8), 0 0 28px rgba(245, 158, 11, 0.25);
+        }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body oncontextmenu="return false;">
+
+    <div id="webgl-container"></div>
+    <canvas id="gesture-canvas"></canvas>
+    <canvas id="lightning-fx-canvas"></canvas>
+
+    <div id="title-screen" class="fixed inset-0 z-40 flex flex-col justify-between p-5 md:p-8 bg-gradient-to-b from-slate-950/85 via-slate-950/60 to-slate-950/95 backdrop-blur-[3px] transition-opacity duration-500">
+        <!-- Top Bar -->
+        <div class="relative z-50 flex flex-wrap items-center justify-between gap-4 max-w-7xl w-full mx-auto">
+            <div class="flex items-center gap-3">
+                <div class="w-11 h-11 rounded-xl bg-amber-500/20 border border-amber-400/50 flex items-center justify-center text-amber-300 shadow-lg">
+                    <i class="fa-solid fa-hand-sparkles text-xl"></i>
+                </div>
+                <div>
+                    <div class="text-[11px] uppercase tracking-[0.28em] text-amber-300/90 font-semibold">Black &amp; White II • Age of Empires IV Engine</div>
+                    <div class="text-sm text-slate-300 font-medium">Wähle deinen Titanen-Slot &amp; entfessle deine göttliche Macht</div>
+                </div>
+            </div>
+
+            <!-- 5 Creature Slots Bar in Title Screen -->
+            <div class="flex flex-wrap items-center gap-2 aoe-panel px-3 py-2 rounded-2xl">
+                <span class="text-[11px] uppercase tracking-wider text-amber-200 font-semibold mr-1">Titanen-Slots:</span>
+                <div id="title-slot-buttons" class="flex items-center gap-1.5"></div>
+                <button onclick="window.openCreatureDesigner()" class="ml-2 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 font-bold text-xs hover:brightness-110 transition shadow">
+                    <i class="fa-solid fa-dna mr-1"></i>Kreatur-Designer (5 Slots)
+                </button>
+                <button id="btn-continue-saved" onclick="window.loadSavedWorld()" class="hidden px-3 py-1.5 rounded-xl bg-emerald-500/20 border border-emerald-400/50 text-emerald-200 font-bold text-xs hover:bg-emerald-500/30 transition items-center gap-1.5">
+                    <i class="fa-solid fa-floppy-disk"></i>Spielstand laden
+                </button>
+            </div>
+        </div>
+
+        <!-- Center Title & 3D Parallax Scroller -->
+        <div class="relative z-50 my-auto max-w-7xl w-full mx-auto flex flex-col items-center text-center">
+            <div class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-amber-500/15 border border-amber-400/40 text-amber-300 text-xs font-semibold tracking-widest uppercase mb-3">
+                <i class="fa-solid fa-bolt"></i> High-Res Procedural 3D • Volumetrische Wolkenhand • Bipedal Creature AI
+            </div>
+            <h1 class="font-cinzel text-5xl sm:text-7xl md:text-8xl font-black tracking-[0.16em] text-transparent bg-clip-text bg-gradient-to-b from-amber-100 via-amber-300 to-amber-600 godless-title-glow">
+                GOD:less
+            </h1>
+            <p class="mt-2 max-w-2xl text-xs sm:text-sm md:text-base text-slate-300/95 leading-relaxed">
+                Forme deine Zivilisation vom ersten Gebet an. Greife mit deiner schwebenden Wolkenhand direkt in die blühende Welt ein, errichte eine klassische Metropole mit Kuppeltempel oder entfessle Feuer, Vulkane und deinen gigantischen Kreaturen-Titanen.
+            </p>
+
+            <!-- Scroller Navigation + 4 Mode Cards -->
+            <div class="relative w-full mt-6">
+                <button onclick="window.scrollModeCards(-1)" class="hidden md:flex absolute -left-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full aoe-panel items-center justify-center text-amber-300 hover:scale-110 transition">
+                    <i class="fa-solid fa-chevron-left"></i>
+                </button>
+                <button onclick="window.scrollModeCards(1)" class="hidden md:flex absolute -right-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full aoe-panel items-center justify-center text-amber-300 hover:scale-110 transition">
+                    <i class="fa-solid fa-chevron-right"></i>
+                </button>
+
+                <div id="godless-scroller" class="flex gap-5 overflow-x-auto no-scrollbar py-4 px-2 snap-x snap-mandatory justify-start lg:justify-center">
+                    <!-- Card 1: Singleplayer -->
+                    <div onmousemove="window.tiltCard3D(event, this)" onmouseleave="window.resetCard3D(this)" onclick="window.startGameMode('singleplayer')"
+                         class="godless-card snap-center shrink-0 w-72 sm:w-80 aoe-panel rounded-2xl p-5 text-left cursor-pointer flex flex-col justify-between border border-amber-500/40">
+                        <div>
+                            <div class="flex items-center justify-between mb-3">
+                                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-400/30">Kampagne &amp; Sandbox</span>
+                                <i class="fa-solid fa-crown text-amber-400 text-xl"></i>
+                            </div>
+                            <h3 class="font-cinzel text-xl font-bold text-amber-100">Singleplayer: Ursprung</h3>
+                            <p class="text-xs text-slate-300 mt-2 leading-relaxed">
+                                Starte in Epoche I mit 7 Siedlern vor deinem klassischen Kuppeltempel. Manifestiere Glauben über 4 Zeitalter, erziehe deinen Titanen und bezwinge Wikinger, Japaner und Azteken.
+                            </p>
+                        </div>
+                        <div class="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs font-bold text-amber-300">
+                            <span>Welt erschaffen</span>
+                            <i class="fa-solid fa-arrow-right"></i>
+                        </div>
+                    </div>
+
+                    <!-- Card 2: Multiplayer & Discord -->
+                    <div onmousemove="window.tiltCard3D(event, this)" onmouseleave="window.resetCard3D(this)" onclick="window.openDiscordModal()"
+                         class="godless-card snap-center shrink-0 w-72 sm:w-80 aoe-panel rounded-2xl p-5 text-left cursor-pointer flex flex-col justify-between border border-indigo-500/40">
+                        <div>
+                            <div class="flex items-center justify-between mb-3">
+                                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-400/30">Discord-Pantheon</span>
+                                <i class="fa-brands fa-discord text-indigo-400 text-xl"></i>
+                            </div>
+                            <h3 class="font-cinzel text-xl font-bold text-indigo-100">Multiplayer &amp; Discord</h3>
+                            <p class="text-xs text-slate-300 mt-2 leading-relaxed">
+                                Verbinde deinen Discord-Server per Invite oder Webhook, teile deinen Pantheon-Raumcode mit Freunden und sende Live-Schlachtberichte in euren Channel.
+                            </p>
+                        </div>
+                        <div class="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs font-bold text-indigo-300">
+                            <span>Discord-Lobby öffnen</span>
+                            <i class="fa-solid fa-link"></i>
+                        </div>
+                    </div>
+
+                    <!-- Card 3: Training / Tutorial -->
+                    <div onmousemove="window.tiltCard3D(event, this)" onmouseleave="window.resetCard3D(this)" onclick="window.startGameMode('tutorial')"
+                         class="godless-card snap-center shrink-0 w-72 sm:w-80 aoe-panel rounded-2xl p-5 text-left cursor-pointer flex flex-col justify-between border border-sky-500/40">
+                        <div>
+                            <div class="flex items-center justify-between mb-3">
+                                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-sky-500/20 text-sky-300 border border-sky-400/30">Interaktive Lehre</span>
+                                <i class="fa-solid fa-graduation-cap text-sky-400 text-xl"></i>
+                            </div>
+                            <h3 class="font-cinzel text-xl font-bold text-sky-100">Trainings-Session</h3>
+                            <p class="text-xs text-slate-300 mt-2 leading-relaxed">
+                                Lerne Schritt für Schritt die Führung der schwebenden Wolkenhand, das Greifen &amp; Werfen, den mehrstufigen Gebäudebau, Runen-Gestenwunder und die Kreaturenerziehung.
+                            </p>
+                        </div>
+                        <div class="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs font-bold text-sky-300">
+                            <span>Training starten</span>
+                            <i class="fa-solid fa-play"></i>
+                        </div>
+                    </div>
+
+                    <!-- Card 4: Creature Designer & Settings -->
+                    <div onmousemove="window.tiltCard3D(event, this)" onmouseleave="window.resetCard3D(this)" onclick="window.openSettingsModal()"
+                         class="godless-card snap-center shrink-0 w-72 sm:w-80 aoe-panel rounded-2xl p-5 text-left cursor-pointer flex flex-col justify-between border border-emerald-500/40">
+                        <div>
+                            <div class="flex items-center justify-between mb-3">
+                                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">Grafik &amp; Kosmos</span>
+                                <i class="fa-solid fa-sliders text-emerald-400 text-xl"></i>
+                            </div>
+                            <h3 class="font-cinzel text-xl font-bold text-emerald-100">Göttliche Settings</h3>
+                            <p class="text-xs text-slate-300 mt-2 leading-relaxed">
+                                Konfiguriere 3D-Auflösung, Blitz-Maus-Intensität, Tag-/Nacht-Geschwindigkeit, Kamera-Empfindlichkeit und verwalte deine gespeicherten Welten.
+                            </p>
+                        </div>
+                        <div class="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs font-bold text-emerald-300">
+                            <span>Einstellungen öffnen</span>
+                            <i class="fa-solid fa-gear"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Controls Hint -->
+        <div class="relative z-50 max-w-7xl w-full mx-auto flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400 border-t border-slate-800/80 pt-3">
+            <div><strong class="text-amber-300">Steuerung im Spiel:</strong> <kbd class="px-1.5 py-0.5 bg-slate-800 rounded">WASD</kbd> / <kbd class="px-1.5 py-0.5 bg-slate-800 rounded">Pfeiltasten</kbd> Kamera • <kbd class="px-1.5 py-0.5 bg-slate-800 rounded">Q/E</kbd> Drehen • <kbd class="px-1.5 py-0.5 bg-slate-800 rounded">Mausrad</kbd> Zoom</div>
+            <div><strong class="text-sky-300">Wolkenhand Gottes:</strong> <kbd class="px-1.5 py-0.5 bg-slate-800 rounded">Linksklick</kbd> Greifen / Bauen / Werfen • <kbd class="px-1.5 py-0.5 bg-slate-800 rounded">Rechtsklick halten</kbd> Wunder-Rune zeichnen</div>
+        </div>
+    </div>
+
+    <div id="creature-designer-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+        <div class="aoe-panel rounded-3xl max-w-2xl w-full p-6 border border-amber-400/50 shadow-2xl">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+                <div>
+                    <h2 class="font-cinzel text-2xl font-bold text-amber-200">🧬 5-Slot Titanen-Designer</h2>
+                    <p class="text-xs text-slate-400">Passe Spezies, Felltextur, Muskelmasse, Hörner und Rüstung deiner 5 Kreaturen-Slots an</p>
+                </div>
+                <button onclick="window.closeCreatureDesigner()" class="w-9 h-9 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700">✕</button>
+            </div>
+
+            <!-- 5 Slot Tabs -->
+            <div id="designer-slot-tabs" class="grid grid-cols-5 gap-2 mb-4"></div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1">Name des Titanen</label>
+                    <input id="cd-name" type="text" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-amber-100 font-semibold" />
+                </div>
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1">Spezies (Bipedal B&amp;W2 Avatar)</label>
+                    <select id="cd-species" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-amber-100 font-semibold">
+                        <option value="lion">🦁 Königslöwe (Denker &amp; Herrscher)</option>
+                        <option value="ape">🦍 Titan-Gorilla (Silberrücken-Koloss)</option>
+                        <option value="wolf">🐺 Dire-Wolf (Schneller Jäger)</option>
+                        <option value="tiger">🐯 Säbelzahn-Tiger (Streifen-Raubtier)</option>
+                        <option value="cow">🐮 Minotaurus-Stier (Gehörnter Wächter)</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1">Körpergröße (<span id="cd-scale-val">1.15</span>x)</label>
+                    <input id="cd-scale" type="range" min="0.85" max="1.55" step="0.05" class="w-full accent-amber-400" oninput="document.getElementById('cd-scale-val').textContent=this.value" />
+                </div>
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1">Muskelmasse &amp; Brustkorb (<span id="cd-muscle-val">1.20</span>x)</label>
+                    <input id="cd-muscle" type="range" min="0.85" max="1.50" step="0.05" class="w-full accent-amber-400" oninput="document.getElementById('cd-muscle-val').textContent=this.value" />
+                </div>
+
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1">Hörner / Kopfschmuck</label>
+                    <select id="cd-horns" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-200">
+                        <option value="none">Keine Hörner</option>
+                        <option value="curved">Geschwungene Stierhörner</option>
+                        <option value="crown">Goldene Dornenkrone</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1">Schulter- &amp; Brustpanzer</label>
+                    <select id="cd-armor" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-200">
+                        <option value="none">Keine Rüstung (Naturfell)</option>
+                        <option value="gold">Göttlicher Goldpanzer</option>
+                        <option value="obsidian">Dunkler Obsidian-Kriegspanzer</option>
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-3 gap-2 sm:col-span-2 pt-1">
+                    <div>
+                        <label class="block text-slate-300 font-semibold mb-1">Hauptfellfarbe</label>
+                        <input id="cd-color1" type="color" class="w-full h-9 rounded-lg bg-slate-900 border border-slate-700 cursor-pointer" />
+                    </div>
+                    <div>
+                        <label class="block text-slate-300 font-semibold mb-1">Mähne / Streifen</label>
+                        <input id="cd-color2" type="color" class="w-full h-9 rounded-lg bg-slate-900 border border-slate-700 cursor-pointer" />
+                    </div>
+                    <div>
+                        <label class="block text-slate-300 font-semibold mb-1">Augenleuchten</label>
+                        <input id="cd-eye" type="color" class="w-full h-9 rounded-lg bg-slate-900 border border-slate-700 cursor-pointer" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between mt-6 pt-4 border-t border-slate-800">
+                <button onclick="window.resetCreatureSlotsDefault()" class="px-3.5 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-slate-700">
+                    Standard wiederherstellen
+                </button>
+                <div class="flex gap-2">
+                    <button onclick="window.closeCreatureDesigner()" class="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-slate-700">
+                        Schließen
+                    </button>
+                    <button onclick="window.saveCurrentCreatureSlot()" class="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 font-bold text-xs hover:brightness-110 shadow-lg">
+                        <i class="fa-solid fa-check mr-1"></i>Slot speichern &amp; 3D-Titan aktualisieren
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="discord-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+        <div class="aoe-panel rounded-3xl max-w-lg w-full p-6 border border-indigo-400/50 shadow-2xl">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+                <div class="flex items-center gap-2.5">
+                    <i class="fa-brands fa-discord text-2xl text-indigo-400"></i>
+                    <div>
+                        <h2 class="font-cinzel text-xl font-bold text-indigo-100">Discord-Pantheon &amp; Koop-Lobby</h2>
+                        <p class="text-xs text-slate-400">Verbinde deinen Discord-Server &amp; spiele mit Freunden</p>
+                    </div>
+                </div>
+                <button onclick="window.closeDiscordModal()" class="w-8 h-8 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700">✕</button>
+            </div>
+
+            <div class="space-y-3 text-xs">
+                <div class="p-3 rounded-2xl bg-indigo-950/40 border border-indigo-500/30 flex items-center justify-between">
+                    <div>
+                        <div class="text-slate-400">Dein Pantheon-Raumcode:</div>
+                        <div id="discord-room-code" class="font-mono text-base font-bold text-amber-300">OLYMP-7742</div>
+                    </div>
+                    <button onclick="window.copyRoomCode()" class="px-3 py-1.5 rounded-xl bg-indigo-500/30 border border-indigo-400/40 text-indigo-200 font-semibold hover:bg-indigo-500/40">
+                        <i class="fa-solid fa-copy mr-1"></i>Code kopieren
+                    </button>
+                </div>
+
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1">Discord Server-Invite oder Channel-Link</label>
+                    <input id="discord-invite-input" type="text" placeholder="https://discord.gg/dein-server" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-200" />
+                </div>
+
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1">Discord Webhook-URL (Optional für Live-Chronik-Pings)</label>
+                    <input id="discord-webhook-input" type="text" placeholder="https://discord.com/api/webhooks/..." class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-200" />
+                </div>
+
+                <div id="discord-status-msg" class="text-emerald-300 font-medium min-h-[18px]"></div>
+            </div>
+
+            <div class="flex items-center justify-end gap-2 mt-5 pt-3 border-t border-slate-800">
+                <button onclick="window.sendDiscordWebhookPing()" class="px-4 py-2 rounded-xl bg-indigo-600/30 border border-indigo-400/50 text-indigo-200 text-xs font-bold hover:bg-indigo-600/40">
+                    <i class="fa-solid fa-paper-plane mr-1"></i>Test-Ping senden
+                </button>
+                <button onclick="window.closeDiscordModal(); window.startGameMode('multiplayer');" class="px-5 py-2 rounded-xl bg-gradient-to-r from-indigo-500 to-sky-500 text-white text-xs font-bold hover:brightness-110 shadow-lg">
+                    Multiplayer-Welt starten
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="settings-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+        <div class="aoe-panel rounded-3xl max-w-md w-full p-6 border border-emerald-400/40 shadow-2xl">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+                <h2 class="font-cinzel text-xl font-bold text-emerald-200">⚙️ Göttliche Einstellungen</h2>
+                <button onclick="window.closeSettingsModal()" class="w-8 h-8 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700">✕</button>
+            </div>
+            <div class="space-y-4 text-xs">
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1">Maus-Blitz-Intensität im Titelbildschirm</label>
+                    <input type="range" min="0" max="2" step="0.2" value="1.2" class="w-full accent-amber-400" oninput="window.setLightningIntensity(this.value)" />
+                </div>
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1">3D-Render-Qualität (Pixel Ratio)</label>
+                    <select onchange="window.setRenderQuality(this.value)" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-200">
+                        <option value="1">Standard (60 FPS Fokus)</option>
+                        <option value="1.5">Hoch (1.5x Supersampling)</option>
+                        <option value="2" selected>Ultra (2.0x Retina / High-Res)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="flex justify-end mt-6 pt-3 border-t border-slate-800">
+                <button onclick="window.closeSettingsModal()" class="px-5 py-2 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs">Fertig</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="game-hud" class="fixed inset-0 z-20 pointer-events-none hidden flex-col justify-between p-3 sm:p-4">
+        <!-- Top Row: Faith & Epoch, World Clock & Speed, Resources & Save/Menu -->
+        <div class="flex flex-wrap items-start justify-between gap-2 w-full">
+            <!-- Left: Epoch, Faith & Alignment -->
+            <div class="pointer-events-auto aoe-panel rounded-2xl px-3.5 py-2 flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-400/50 flex flex-col items-center justify-center text-amber-300">
+                    <span class="text-[9px] uppercase tracking-tighter">Epoche</span>
+                    <span id="hud-epoch-roman" class="font-cinzel font-black text-base leading-none">I</span>
+                </div>
+                <div class="text-xs">
+                    <div class="flex items-center gap-2">
+                        <span id="hud-epoch-name" class="font-bold text-amber-100">Ursprung (Nomaden)</span>
+                        <span class="text-amber-300 font-semibold">🙏 <span id="hud-faith-val">15</span>/<span id="hud-faith-max">100</span></span>
+                    </div>
+                    <div class="w-36 h-1.5 bg-slate-800 rounded-full overflow-hidden mt-1">
+                        <div id="hud-faith-bar" class="h-full bg-gradient-to-r from-amber-500 to-yellow-300 transition-all duration-300" style="width: 15%;"></div>
+                    </div>
+                    <div class="flex items-center justify-between text-[10px] text-slate-400 mt-1">
+                        <span>Gesinnung: <strong id="hud-align-label" class="text-slate-200">Neutral (0)</strong></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Center: Realistic Slow World Clock, Season & Speed Controls -->
+            <div class="pointer-events-auto aoe-panel rounded-2xl px-3.5 py-2 flex items-center gap-3">
+                <div class="text-xs">
+                    <div class="flex items-center gap-2 font-bold text-amber-200">
+                        <span id="hud-season-icon">🌱</span>
+                        <span id="hud-season-name">Frühling</span>
+                        <span class="text-slate-400">•</span>
+                        <span id="hud-time-clock">Tag 1, 10:12</span>
+                    </div>
+                    <div class="flex items-center gap-2 text-[10px] text-slate-300 mt-0.5">
+                        <span id="hud-hand-context">☁️🖐️ Göttliche Wolkenhand bereit (Bewege Maus über Siedler, Bäume oder Baustellen)</span>
+                    </div>
+                </div>
+                <div class="flex items-center gap-1 border-l border-slate-700 pl-2">
+                    <button onclick="window.setTimeScale(0)" id="speed-0" title="Pause" class="px-2 py-1 rounded text-[10px] font-bold bg-slate-800 text-slate-300 hover:bg-slate-700">⏸</button>
+                    <button onclick="window.setTimeScale(1)" id="speed-1" title="Normal (Realistisch langsam)" class="px-2 py-1 rounded text-[10px] font-bold bg-amber-500 text-slate-950">1x</button>
+                    <button onclick="window.setTimeScale(2)" id="speed-2" title="Doppelt" class="px-2 py-1 rounded text-[10px] font-bold bg-slate-800 text-slate-300 hover:bg-slate-700">2x</button>
+                    <button onclick="window.setTimeScale(4)" id="speed-4" title="Schnellvorlauf" class="px-2 py-1 rounded text-[10px] font-bold bg-slate-800 text-slate-300 hover:bg-slate-700">4x</button>
+                </div>
+            </div>
+
+            <!-- Right: Resources & Save / Menu -->
+            <div class="pointer-events-auto aoe-panel rounded-2xl px-3.5 py-2 flex flex-wrap items-center gap-3 text-xs">
+                <div title="Nahrung (Getreide)"><span class="text-amber-400">🌾</span> <strong id="res-food">160</strong></div>
+                <div title="Holz"><span class="text-emerald-400">🌲</span> <strong id="res-wood">160</strong></div>
+                <div title="Erz"><span class="text-slate-300">⛏️</span> <strong id="res-ore">90</strong></div>
+                <div title="Göttliches Mana"><span class="text-sky-400">✨</span> <strong id="res-mana">280</strong></div>
+                <div title="Bevölkerung"><span class="text-rose-300">👥</span> <strong id="res-pop">7/16</strong></div>
+                <div class="flex items-center gap-1.5 border-l border-slate-700 pl-2">
+                    <button onclick="window.saveWorldState()" class="px-2.5 py-1 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 font-semibold hover:bg-emerald-500/30">
+                        <i class="fa-solid fa-floppy-disk mr-1"></i>Speichern
+                    </button>
+                    <button onclick="window.returnToTitleScreen()" class="px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 font-semibold hover:bg-slate-700">
+                        <i class="fa-solid fa-house mr-1"></i>Menü
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Middle Left: Creature Titan Control & Rival Tribes -->
+        <div class="flex items-start justify-between my-auto w-full pointer-events-none">
+            <div class="pointer-events-auto aoe-panel rounded-2xl p-3 w-64 space-y-2.5 text-xs">
+                <div class="flex items-center justify-between">
+                    <span class="font-cinzel font-bold text-amber-200" id="hud-creature-name">🦁 Aurion (Löwe)</span>
+                    <button onclick="window.openCreatureDesigner()" class="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-400/30 hover:bg-amber-500/30">
+                        Designer
+                    </button>
+                </div>
+                <div id="hud-slot-switcher" class="grid grid-cols-5 gap-1"></div>
+                <div class="text-[11px] text-sky-300 truncate" id="hud-creature-state">Denkt nach &amp; wacht über die Polis</div>
+
+                <!-- 5 Creature Roles -->
+                <div class="grid grid-cols-5 gap-1 pt-1">
+                    <button onclick="window.setCreatureRole('free')" id="crole-free" class="px-1.5 py-1 rounded bg-amber-500 text-slate-950 font-bold text-[10px]" title="Freier Wille">Frei</button>
+                    <button onclick="window.setCreatureRole('gather')" id="crole-gather" class="px-1.5 py-1 rounded bg-slate-800 text-slate-300 font-semibold text-[10px]" title="Sammler">Sammeln</button>
+                    <button onclick="window.setCreatureRole('builder')" id="crole-builder" class="px-1.5 py-1 rounded bg-slate-800 text-slate-300 font-semibold text-[10px]" title="Baumeister">Bauen</button>
+                    <button onclick="window.setCreatureRole('entertain')" id="crole-entertain" class="px-1.5 py-1 rounded bg-slate-800 text-slate-300 font-semibold text-[10px]" title="Alleinunterhalter">Jubel</button>
+                    <button onclick="window.setCreatureRole('soldier')" id="crole-soldier" class="px-1.5 py-1 rounded bg-slate-800 text-slate-300 font-semibold text-[10px]" title="Soldat">Krieg</button>
+                </div>
+
+                <!-- Praise / Slap -->
+                <div class="grid grid-cols-2 gap-1.5 pt-1">
+                    <button onclick="window.praiseCreature()" class="py-1.5 rounded-xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 font-semibold hover:bg-emerald-500/30">
+                        🙌 Loben (+Gut)
+                    </button>
+                    <button onclick="window.punishCreature()" class="py-1.5 rounded-xl bg-rose-500/20 border border-rose-400/40 text-rose-200 font-semibold hover:bg-rose-500/30">
+                        ⚡ Strafen (+Böse)
+                    </button>
+                </div>
+
+                <!-- Rival Tribes Impression -->
+                <div class="border-t border-slate-800 pt-2 space-y-1 text-[10px]">
+                    <div class="flex justify-between"><span>🛡️ Wikinger (Norden)</span><span id="tribe-vikings-val" class="text-amber-300 font-bold">35%</span></div>
+                    <div class="flex justify-between"><span>⛩️ Japaner (Osten)</span><span id="tribe-japanese-val" class="text-amber-300 font-bold">20%</span></div>
+                    <div class="flex justify-between"><span>🔥 Azteken (Süden)</span><span id="tribe-aztecs-val" class="text-amber-300 font-bold">5%</span></div>
+                </div>
+            </div>
+
+            <!-- Interactive Tutorial Banner & Toast Feed -->
+            <div class="flex flex-col items-end gap-2 max-w-sm">
+                <div id="tutorial-banner" class="hidden pointer-events-auto aoe-panel rounded-2xl p-3.5 border border-sky-400/60 text-xs space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="font-cinzel font-bold text-sky-300">🎓 Trainings-Lehre</span>
+                        <button onclick="window.nextTutorialStep()" class="px-2 py-0.5 rounded bg-sky-500/30 text-sky-200 text-[10px] font-bold">Weiter →</button>
+                    </div>
+                    <div id="tutorial-text" class="text-slate-200 leading-relaxed"></div>
+                </div>
+                <div id="divine-toast" class="pointer-events-none aoe-panel rounded-2xl px-4 py-2 text-xs font-semibold text-amber-200 opacity-0 transition-opacity duration-300"></div>
+            </div>
+        </div>
+
+        <!-- Bottom Bar: AoE4 / B&W2 Building Construction & Miracle Gestures -->
+        <div class="flex flex-wrap items-end justify-between gap-2 w-full">
+            <!-- Construction Menu -->
+            <div class="pointer-events-auto aoe-panel rounded-2xl p-2 flex flex-wrap items-center gap-1.5">
+                <button onclick="window.selectBuildMode('house')" id="build-house" class="px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-xs flex items-center gap-2">
+                    <span>🏛️</span>
+                    <div class="text-left"><div class="font-bold text-amber-100">Klassische Villa</div><div class="text-[10px] text-slate-400">30 Holz • +4 Wohnraum</div></div>
+                </button>
+                <button onclick="window.selectBuildMode('mill')" id="build-mill" class="px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-xs flex items-center gap-2">
+                    <span>🌾</span>
+                    <div class="text-left"><div class="font-bold text-amber-100">Windmühle &amp; Felder</div><div class="text-[10px] text-slate-400">40 Holz • +Nahrung</div></div>
+                </button>
+                <button onclick="window.selectBuildMode('warehouse')" id="build-warehouse" class="px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-xs flex items-center gap-2">
+                    <span>📦</span>
+                    <div class="text-left"><div class="font-bold text-amber-100">Lagerhaus</div><div class="text-[10px] text-slate-400">35 Holz • Rohstoff-Depot</div></div>
+                </button>
+                <button onclick="window.selectBuildMode('barracks')" id="build-barracks" class="px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-xs flex items-center gap-2">
+                    <span>⚔️</span>
+                    <div class="text-left"><div class="font-bold text-amber-100">Festungs-Kaserne</div><div class="text-[10px] text-slate-400">45 Holz, 25 Erz</div></div>
+                </button>
+                <button onclick="window.selectBuildMode('shrine')" id="build-shrine" class="px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-xs flex items-center gap-2">
+                    <span>⛩️</span>
+                    <div class="text-left"><div class="font-bold text-amber-100">Kuppelschrein</div><div class="text-[10px] text-slate-400">35 Holz, 20 Erz • +Glaube</div></div>
+                </button>
+            </div>
+
+            <!-- Miracle Bar (Right-Click Gesture or Quick Click) -->
+            <div class="pointer-events-auto aoe-panel rounded-2xl p-2 flex flex-wrap items-center gap-1.5">
+                <span class="text-[10px] uppercase tracking-wider text-sky-300 font-bold px-1.5">Wunder (Rechtsklick-Rune):</span>
+                <button onclick="window.castMiracleAtCursor('water')" class="px-2.5 py-1.5 rounded-xl bg-sky-500/20 border border-sky-400/40 text-sky-200 text-xs font-semibold hover:bg-sky-500/30" title="Rune: Spirale / Kreis">
+                    🌧️ Segensregen (25✨)
+                </button>
+                <button onclick="window.castMiracleAtCursor('heal')" class="px-2.5 py-1.5 rounded-xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 text-xs font-semibold hover:bg-emerald-500/30" title="Rune: Kreuz / Herz">
+                    💚 Heilung &amp; Reparatur (35✨)
+                </button>
+                <button onclick="window.castMiracleAtCursor('fireball')" class="px-2.5 py-1.5 rounded-xl bg-orange-500/20 border border-orange-400/40 text-orange-200 text-xs font-semibold hover:bg-orange-500/30" title="Rune: Kreis">
+                    🔥 Feuerball (45✨)
+                </button>
+                <button onclick="window.castMiracleAtCursor('lightning')" class="px-2.5 py-1.5 rounded-xl bg-yellow-500/20 border border-yellow-400/40 text-yellow-200 text-xs font-semibold hover:bg-yellow-500/30" title="Rune: Zick-Zack">
+                    ⚡ Blitzschlag (55✨)
+                </button>
+                <button onclick="window.castMiracleAtCursor('volcano')" class="px-2.5 py-1.5 rounded-xl bg-rose-500/20 border border-rose-400/40 text-rose-200 text-xs font-semibold hover:bg-rose-500/30" title="Rune: Dreieck △">
+                    🌋 Epischer Vulkan (110✨)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================================
+        // 1. GLOBAL STATE, 5 CREATURE SLOTS & WORLD SAVE/LOAD SYSTEM
+        // ============================================================================
+        const EPOCHS = [
+            { id: 1, roman: 'I', name: 'Ursprung (Nomaden)', faithReq: 0, influenceRadius: 50 },
+            { id: 2, roman: 'II', name: 'Archaische Polis', faithReq: 100, influenceRadius: 72 },
+            { id: 3, roman: 'III', name: 'Klassische Metropole', faithReq: 260, influenceRadius: 96 },
+            { id: 4, roman: 'IV', name: 'Göttliches Imperium', faithReq: 500, influenceRadius: 126 }
+        ];
+
+        const SEASONS = [
+            { id: 'spring', name: 'Frühling', icon: '🌱', foliageColor: 0x387834, foodMult: 1.2 },
+            { id: 'summer', name: 'Sommer', icon: '☀️', foliageColor: 0x2c6829, foodMult: 1.35 },
+            { id: 'autumn', name: 'Herbst', icon: '🍂', foliageColor: 0xb85d1e, foodMult: 1.0 },
+            { id: 'winter', name: 'Winter', icon: '❄️', foliageColor: 0xdbeafe, foodMult: 0.7 }
+        ];
+
+        const SPECIES_META = {
+            lion: { icon: '🦁', label: 'Königslöwe' },
+            wolf: { icon: '🐺', label: 'Dire-Wolf' },
+            ape:  { icon: '🦍', label: 'Titan-Gorilla' },
+            tiger:{ icon: '🐯', label: 'Säbelzahn-Tiger' },
+            cow:  { icon: '🐮', label: 'Minotaurus-Stier' }
+        };
+
+        const DEFAULT_CREATURE_SLOTS = [
+            { slot: 1, name: 'Aurion (Löwe)', species: 'lion', color1: '#c87d32', color2: '#6b3410', eyeColor: '#f59e0b', scale: 1.12, muscle: 1.15, horns: 'none', armor: 'none' },
+            { slot: 2, name: 'Gorgor (Gorilla)', species: 'ape', color1: '#3b3d42', color2: '#1f2024', eyeColor: '#ef4444', scale: 1.18, muscle: 1.32, horns: 'none', armor: 'none' },
+            { slot: 3, name: 'Fenris (Wolf)', species: 'wolf', color1: '#525b66', color2: '#232931', eyeColor: '#38bdf8', scale: 1.05, muscle: 1.08, horns: 'none', armor: 'obsidian' },
+            { slot: 4, name: 'Rajah (Tiger)', species: 'tiger', color1: '#d96b1f', color2: '#1c1917', eyeColor: '#34d399', scale: 1.08, muscle: 1.12, horns: 'none', armor: 'gold' },
+            { slot: 5, name: 'Asterion (Stier)', species: 'cow', color1: '#6e472b', color2: '#29190e', eyeColor: '#fbbf24', scale: 1.16, muscle: 1.28, horns: 'curved', armor: 'gold' }
+        ];
+
+        const state = {
+            inTitleScreen: true,
+            mode: 'singleplayer',
+            epochIndex: 0,
+            faith: 15,
+            alignment: 0,
+            resources: { food: 160, wood: 160, ore: 90, mana: 280, pop: 7, maxPop: 16 },
+            time: {
+                day: 1,
+                hour: 10.2,
+                scale: 1,
+                seasonIndex: 0,
+                cosmicActive: null,
+                cosmicTimer: 0
+            },
+            activeSlotIndex: 0,
+            creatureSlots: JSON.parse(JSON.stringify(DEFAULT_CREATURE_SLOTS)),
+            creature: {
+                role: 'free',
+                hp: 100,
+                hunger: 10,
+                mesh: null,
+                joints: {},
+                targetPos: new THREE.Vector3(14, 0, 12),
+                stateText: 'Denkt nach & wacht über die Polis',
+                walkPhase: 0,
+                animMode: 'think',
+                animTimer: 0
+            },
+            tribes: {
+                vikings: { name: 'Wikinger', impress: 35, pos: new THREE.Vector3(0, 0, -95) },
+                japanese: { name: 'Japaner', impress: 20, pos: new THREE.Vector3(95, 0, 5) },
+                aztecs: { name: 'Azteken', impress: 5, pos: new THREE.Vector3(-10, 0, 98) }
+            },
+            buildMode: null,
+            heldObject: null,
+            hoveredEntity: null,
+            lightningIntensity: 1.2,
+            tutorial: { active: false, step: 0 }
+        };
+
+        try {
+            const savedSlots = localStorage.getItem('godless_creature_slots_v2');
+            if (savedSlots) state.creatureSlots = JSON.parse(savedSlots);
+            const savedWorld = localStorage.getItem('godless_saved_world_v2');
+            if (savedWorld) {
+                const btn = document.getElementById('btn-continue-saved');
+                if (btn) { btn.classList.remove('hidden'); btn.classList.add('inline-flex'); }
+            }
+        } catch (e) {}
+
+        const SoundFX = {
+            ctx: null,
+            init() {
+                if (!this.ctx) {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    if (AudioCtx) this.ctx = new AudioCtx();
+                }
+            },
+            playTone(freq = 440, duration = 0.22, type = 'sine', gainVal = 0.07) {
+                try {
+                    this.init();
+                    if (!this.ctx) return;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                    gain.gain.setValueAtTime(gainVal, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + duration);
+                } catch (e) {}
+            },
+            playThunder() {
+                this.playTone(62, 0.52, 'sawtooth', 0.11);
+                setTimeout(() => this.playTone(44, 0.68, 'triangle', 0.09), 80);
+            },
+            playChime() {
+                this.playTone(523.25, 0.22, 'sine', 0.06);
+                setTimeout(() => this.playTone(659.25, 0.28, 'sine', 0.06), 90);
+                setTimeout(() => this.playTone(783.99, 0.4, 'sine', 0.07), 180);
+            }
+        };
+
+        function showToast(msg) {
+            const el = document.getElementById('divine-toast');
+            if (!el) return;
+            el.textContent = msg;
+            el.style.opacity = '1';
+            clearTimeout(el._timer);
+            el._timer = setTimeout(() => { el.style.opacity = '0'; }, 3200);
+        }
+
+        //        // ============================================================================
+        // 2. HIGH-RESOLUTION PROCEDURAL TEXTURE & SPRITE FORGE (AssetForge)
+        //    Generates crisp 512x512 textures inspired by the B&W2 & AoE4 screenshots
+        // ============================================================================
+        const AssetForge = {
+            createRoofTileTexture() {
+                const c = document.createElement('canvas');
+                c.width = 512; c.height = 512;
+                const ctx = c.getContext('2d');
+                ctx.fillStyle = '#9e3b1c';
+                ctx.fillRect(0, 0, 512, 512);
+                const rows = 12, cols = 16;
+                const rw = 512 / cols, rh = 512 / rows;
+                for (let y = 0; y < rows; y++) {
+                    for (let x = 0; x < cols; x++) {
+                        const shade = (Math.random() - 0.5) * 26;
+                        ctx.fillStyle = `rgb(${176 + shade}, ${68 + shade * 0.6}, ${32 + shade * 0.4})`;
+                        ctx.fillRect(x * rw + 2, y * rh + 2, rw - 4, rh - 3);
+                        const grad = ctx.createLinearGradient(x * rw, y * rh, (x + 1) * rw, y * rh);
+                        grad.addColorStop(0, 'rgba(0,0,0,0.38)');
+                        grad.addColorStop(0.5, 'rgba(255,210,160,0.28)');
+                        grad.addColorStop(1, 'rgba(0,0,0,0.42)');
+                        ctx.fillStyle = grad;
+                        ctx.fillRect(x * rw, y * rh, rw, rh);
+                    }
+                    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+                    ctx.fillRect(0, y * rh, 512, 3);
+                }
+                const tex = new THREE.CanvasTexture(c);
+                tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+                tex.repeat.set(2, 2);
+                return tex;
+            },
+
+            createVerdiDomeTexture() {
+                const c = document.createElement('canvas');
+                c.width = 512; c.height = 512;
+                const ctx = c.getContext('2d');
+                ctx.fillStyle = '#3d5949';
+                ctx.fillRect(0, 0, 512, 512);
+                for (let x = 0; x < 512; x += 32) {
+                    ctx.fillStyle = 'rgba(212, 175, 55, 0.35)';
+                    ctx.fillRect(x, 0, 4, 512);
+                    ctx.fillStyle = 'rgba(15, 25, 20, 0.45)';
+                    ctx.fillRect(x + 4, 0, 3, 512);
+                }
+                for (let y = 0; y < 512; y += 48) {
+                    ctx.strokeStyle = 'rgba(215, 180, 75, 0.4)';
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(4, y + 4, 504, 40);
+                }
+                const tex = new THREE.CanvasTexture(c);
+                tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+                return tex;
+            },
+
+            createClassicalWallTexture() {
+                const c = document.createElement('canvas');
+                c.width = 512; c.height = 512;
+                const ctx = c.getContext('2d');
+                ctx.fillStyle = '#dfd3bc';
+                ctx.fillRect(0, 0, 512, 512);
+                for (let y = 0; y < 512; y += 32) {
+                    ctx.fillStyle = 'rgba(90, 75, 58, 0.16)';
+                    ctx.fillRect(0, y, 512, 2);
+                    const offset = (y / 32) % 2 === 0 ? 0 : 32;
+                    for (let x = offset; x < 512; x += 64) {
+                        ctx.fillRect(x, y, 2, 32);
+                    }
+                }
+                const winCols = [80, 224, 368];
+                const winRows = [110, 300];
+                winRows.forEach(wy => {
+                    winCols.forEach(wx => {
+                        ctx.fillStyle = '#4a321c';
+                        ctx.fillRect(wx - 6, wy - 6, 76, 96);
+                        ctx.fillStyle = '#1e293b';
+                        ctx.fillRect(wx, wy, 64, 84);
+                        const g = ctx.createRadialGradient(wx + 32, wy + 42, 4, wx + 32, wy + 42, 38);
+                        g.addColorStop(0, 'rgba(255, 200, 90, 0.55)');
+                        g.addColorStop(1, 'rgba(15, 23, 42, 0.9)');
+                        ctx.fillStyle = g;
+                        ctx.fillRect(wx, wy, 64, 84);
+                        ctx.fillStyle = '#5c3d22';
+                        ctx.fillRect(wx + 30, wy, 4, 84);
+                        ctx.fillRect(wx, wy + 40, 64, 4);
+                    });
+                });
+                const tex = new THREE.CanvasTexture(c);
+                tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+                return tex;
+            },
+
+            createCobbleRoadTexture() {
+                const c = document.createElement('canvas');
+                c.width = 256; c.height = 256;
+                const ctx = c.getContext('2d');
+                ctx.fillStyle = '#6c655b';
+                ctx.fillRect(0, 0, 256, 256);
+                for (let i = 0; i < 320; i++) {
+                    const rx = Math.random() * 256;
+                    const ry = Math.random() * 256;
+                    const r = 5 + Math.random() * 7;
+                    const v = 105 + Math.floor(Math.random() * 45);
+                    ctx.fillStyle = `rgb(${v}, ${v - 4}, ${v - 10})`;
+                    ctx.beginPath();
+                    ctx.arc(rx, ry, r, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = 'rgba(30,25,20,0.45)';
+                    ctx.lineWidth = 1.2;
+                    ctx.stroke();
+                }
+                const tex = new THREE.CanvasTexture(c);
+                tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+                return tex;
+            },
+
+            createHandSkinTexture() {
+                const c = document.createElement('canvas');
+                c.width = 512; c.height = 512;
+                const ctx = c.getContext('2d');
+                const baseGrad = ctx.createLinearGradient(0, 0, 512, 512);
+                baseGrad.addColorStop(0, '#f5caa6');
+                baseGrad.addColorStop(0.5, '#eab38c');
+                baseGrad.addColorStop(1, '#d6976e');
+                ctx.fillStyle = baseGrad;
+                ctx.fillRect(0, 0, 512, 512);
+
+                for (let i = 0; i < 600; i++) {
+                    ctx.fillStyle = i % 2 === 0 ? 'rgba(255,235,215,0.06)' : 'rgba(165,95,65,0.05)';
+                    ctx.beginPath();
+                    ctx.arc(Math.random() * 512, Math.random() * 512, 2 + Math.random() * 6, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                // Glowing Divine Golden Filigree Veins (as seen on the back of the hand in sample1.jpg)
+                ctx.strokeStyle = 'rgba(255, 230, 130, 0.72)';
+                ctx.shadowColor = '#f5c542';
+                ctx.shadowBlur = 10;
+                ctx.lineWidth = 2.4;
+                for (let b = 0; b < 7; b++) {
+                    ctx.beginPath();
+                    let vx = 140 + b * 38;
+                    let vy = 490;
+                    ctx.moveTo(vx, vy);
+                    for (let s = 0; s < 10; s++) {
+                        vx += (Math.random() - 0.5) * 28;
+                        vy -= 42;
+                        ctx.lineTo(vx, vy);
+                    }
+                    ctx.stroke();
+                }
+                return new THREE.CanvasTexture(c);
+            },
+
+            createFurTexture(primaryHex, secondaryHex, isStriped = false) {
+                const c = document.createElement('canvas');
+                c.width = 512; c.height = 512;
+                const ctx = c.getContext('2d');
+                ctx.fillStyle = primaryHex;
+                ctx.fillRect(0, 0, 512, 512);
+
+                for (let i = 0; i < 4200; i++) {
+                    const hx = Math.random() * 512;
+                    const hy = Math.random() * 512;
+                    ctx.strokeStyle = i % 3 === 0 ? secondaryHex : (i % 2 === 0 ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.22)');
+                    ctx.lineWidth = 1.4;
+                    ctx.beginPath();
+                    ctx.moveTo(hx, hy);
+                    ctx.lineTo(hx + (Math.random() - 0.5) * 4, hy + 8 + Math.random() * 7);
+                    ctx.stroke();
+                }
+
+                if (isStriped) {
+                    ctx.fillStyle = secondaryHex;
+                    for (let y = 20; y < 512; y += 44) {
+                        ctx.beginPath();
+                        ctx.ellipse(256, y, 220, 9, (Math.random() - 0.5) * 0.2, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+                const tex = new THREE.CanvasTexture(c);
+                tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+                return tex;
+            },
+
+            createCloudMistSpriteTexture() {
+                const c = document.createElement('canvas');
+                c.width = 256; c.height = 256;
+                const ctx = c.getContext('2d');
+                const g = ctx.createRadialGradient(128, 128, 12, 128, 128, 120);
+                g.addColorStop(0, 'rgba(235, 252, 255, 0.88)');
+                g.addColorStop(0.38, 'rgba(135, 235, 250, 0.48)');
+                g.addColorStop(0.72, 'rgba(56, 189, 248, 0.16)');
+                g.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                ctx.fillStyle = g;
+                ctx.fillRect(0, 0, 256, 256);
+                return new THREE.CanvasTexture(c);
+            },
+
+            createFireSmokeTexture(isFire = true) {
+                const c = document.createElement('canvas');
+                c.width = 128; c.height = 128;
+                const ctx = c.getContext('2d');
+                const g = ctx.createRadialGradient(64, 64, 6, 64, 64, 60);
+                if (isFire) {
+                    g.addColorStop(0, 'rgba(255, 255, 200, 0.95)');
+                    g.addColorStop(0.35, 'rgba(255, 145, 20, 0.8)');
+                    g.addColorStop(0.7, 'rgba(220, 38, 38, 0.35)');
+                    g.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                } else {
+                    g.addColorStop(0, 'rgba(45, 45, 50, 0.72)');
+                    g.addColorStop(0.5, 'rgba(30, 30, 36, 0.42)');
+                    g.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                }
+                ctx.fillStyle = g;
+                ctx.fillRect(0, 0, 128, 128);
+                return new THREE.CanvasTexture(c);
+            }
+        };
+
+        //        // ============================================================================
+        // 3. TITLE SCREEN LIGHTNING & EMBER OVERLAY
+        // ============================================================================
+        const lightningCanvas = document.getElementById('lightning-fx-canvas');
+        const lCtx = lightningCanvas.getContext('2d');
+        const lightningBolts = [];
+        const cursorEmbers = [];
+        let lastMousePos = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+
+        function resizeOverlayCanvases() {
+            lightningCanvas.width = window.innerWidth;
+            lightningCanvas.height = window.innerHeight;
+            const gCanvas = document.getElementById('gesture-canvas');
+            if (gCanvas) {
+                gCanvas.width = window.innerWidth;
+                gCanvas.height = window.innerHeight;
+            }
+        }
+        window.addEventListener('resize', resizeOverlayCanvases);
+        resizeOverlayCanvases();
+
+        function spawnLightningBranch(x1, y1, x2, y2, color, thickness = 2.0) {
+            const segments = [];
+            const steps = 8;
+            let cx = x1, cy = y1;
+            for (let i = 1; i <= steps; i++) {
+                const t = i / steps;
+                const jitter = (1 - Math.abs(t - 0.5) * 2) * 30;
+                const nx = x1 + (x2 - x1) * t + (Math.random() - 0.5) * jitter;
+                const ny = y1 + (y2 - y1) * t + (Math.random() - 0.5) * jitter;
+                segments.push({ x1: cx, y1: cy, x2: nx, y2: ny });
+                cx = nx; cy = ny;
+            }
+            lightningBolts.push({ segments, color, alpha: 1.0, thickness });
+        }
+
+        window.addEventListener('mousemove', (e) => {
+            const dx = e.clientX - lastMousePos.x;
+            const dy = e.clientY - lastMousePos.y;
+            const speed = Math.hypot(dx, dy);
+            lastMousePos = { x: e.clientX, y: e.clientY };
+
+            if (state.inTitleScreen && speed > 7 && Math.random() < 0.4 * state.lightningIntensity) {
+                const boltColor = e.clientX < window.innerWidth * 0.48 ? '#f87171' : '#fde047';
+                const angle = Math.random() * Math.PI * 2;
+                const reach = 25 + Math.min(speed * 1.3, 85);
+                spawnLightningBranch(e.clientX, e.clientY, e.clientX + Math.cos(angle) * reach, e.clientY + Math.sin(angle) * reach, boltColor, 1.7);
+            }
+            if (state.inTitleScreen && Math.random() < 0.55) {
+                cursorEmbers.push({
+                    x: e.clientX + (Math.random() - 0.5) * 12,
+                    y: e.clientY + (Math.random() - 0.5) * 12,
+                    vx: (Math.random() - 0.5) * 1.1,
+                    vy: -0.7 - Math.random() * 1.4,
+                    size: 1.5 + Math.random() * 2.2,
+                    alpha: 0.9,
+                    color: Math.random() < 0.7 ? '#fbbf24' : '#38bdf8'
+                });
+            }
+        });
+
+        function renderLightningOverlay() {
+            lCtx.clearRect(0, 0, lightningCanvas.width, lightningCanvas.height);
+            for (let i = lightningBolts.length - 1; i >= 0; i--) {
+                const b = lightningBolts[i];
+                lCtx.save();
+                lCtx.globalAlpha = b.alpha;
+                lCtx.strokeStyle = b.color;
+                lCtx.lineWidth = b.thickness;
+                lCtx.shadowColor = b.color;
+                lCtx.shadowBlur = 12;
+                lCtx.beginPath();
+                for (const seg of b.segments) {
+                    lCtx.moveTo(seg.x1, seg.y1);
+                    lCtx.lineTo(seg.x2, seg.y2);
+                }
+                lCtx.stroke();
+                lCtx.restore();
+                b.alpha -= 0.06;
+                if (b.alpha <= 0) lightningBolts.splice(i, 1);
+            }
+            for (let i = cursorEmbers.length - 1; i >= 0; i--) {
+                const p = cursorEmbers[i];
+                p.x += p.vx; p.y += p.vy; p.alpha -= 0.025;
+                if (p.alpha <= 0) { cursorEmbers.splice(i, 1); continue; }
+                lCtx.save();
+                lCtx.globalAlpha = p.alpha;
+                lCtx.fillStyle = p.color;
+                lCtx.beginPath();
+                lCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                lCtx.fill();
+                lCtx.restore();
+            }
+        }
+
+        //        // ============================================================================
+        // 4. THREE.JS WORLD, WILDFLOWER MEADOWS & GLOWING INFLUENCE RIBBON (sample1 & 12)
+        // ============================================================================
+        const container = document.getElementById('webgl-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87b8e6);
+        scene.fog = new THREE.FogExp2(0x9dc3e6, 0.0017);
+
+        const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 1, 1000);
+        const cameraTarget = new THREE.Vector3(0, 4, 4);
+        const camSpherical = {
+            radius: 72,
+            theta: 0.0,
+            phi: 0.88
+        };
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.12;
+        container.appendChild(renderer.domElement);
+
+        const hemiLight = new THREE.HemisphereLight(0xe0f2fe, 0x3b4d28, 0.78);
+        scene.add(hemiLight);
+
+        const sunLight = new THREE.DirectionalLight(0xfff1d0, 1.45);
+        sunLight.position.set(90, 130, 70);
+        sunLight.castShadow = true;
+        sunLight.shadow.mapSize.width = 2048;
+        sunLight.shadow.mapSize.height = 2048;
+        const d = 145;
+        sunLight.shadow.camera.left = -d;
+        sunLight.shadow.camera.right = d;
+        sunLight.shadow.camera.top = d;
+        sunLight.shadow.camera.bottom = -d;
+        sunLight.shadow.camera.near = 10;
+        sunLight.shadow.camera.far = 360;
+        sunLight.shadow.bias = -0.0005;
+        scene.add(sunLight);
+
+        const sunOrb = new THREE.Mesh(new THREE.SphereGeometry(7, 20, 20), new THREE.MeshBasicMaterial({ color: 0xffe082 }));
+        const moonOrb = new THREE.Mesh(new THREE.SphereGeometry(5, 20, 20), new THREE.MeshBasicMaterial({ color: 0xe2e8f0 }));
+        scene.add(sunOrb, moonOrb);
+
+        function pseudoNoise(x, z) {
+            return Math.sin(x * 0.045) * Math.cos(z * 0.045) * 2.2
+                 + Math.sin(x * 0.11 + z * 0.08) * 0.85
+                 + Math.cos(x * 0.23 - z * 0.19) * 0.35;
+        }
+
+        function getTerrainHeight(x, z) {
+            const distFromCenter = Math.hypot(x, z);
+            if (distFromCenter > 154) return -4.8;
+
+            let h = Math.max(-3.6, (1 - Math.pow(distFromCenter / 146, 2.15)) * 8.8) + pseudoNoise(x, z) * 0.52;
+
+            // River canyon
+            const riverCurveX = Math.sin(z * 0.035) * 18 - (z > 0 ? z * 0.45 : 0);
+            const distToRiver = Math.abs(x - riverCurveX);
+            if (distToRiver < 10.5 && z < 48) {
+                const riverDepth = Math.cos((distToRiver / 10.5) * (Math.PI / 2)) * 5.8;
+                h -= riverDepth;
+            }
+
+            // Northern Alpine Range
+            const northDist = Math.hypot(x - 5, z + 100);
+            if (northDist < 56) {
+                const rawMtn = Math.pow(1 - northDist / 56, 1.5) * 26 + pseudoNoise(x * 1.8, z * 1.8) * 1.6;
+                h += Math.round(rawMtn * 0.8) / 0.8 * 0.35 + rawMtn * 0.65;
+            }
+
+            // Eastern Highland Plateau
+            const eastDist = Math.hypot(x - 95, z - 5);
+            if (eastDist < 44) {
+                h += Math.min(9.0, Math.pow(1 - eastDist / 44, 1.15) * 12.5);
+            }
+
+            // Southern Volcanic Caldera
+            const southDist = Math.hypot(x + 10, z - 102);
+            if (southDist < 44) {
+                h += Math.pow(1 - southDist / 44, 1.45) * 17;
+            }
+
+            // Flattened Classical Acropolis & Town Center Plaza
+            const centerPlazaDist = Math.hypot(x, z);
+            if (centerPlazaDist < 42) {
+                const blend = Math.min(1, Math.pow(centerPlazaDist / 42, 1.8));
+                h = h * blend + 4.35 * (1 - blend);
+            }
+            return h;
+        }
+
+        const terrainGeo = new THREE.PlaneGeometry(330, 330, 220, 220);
+        terrainGeo.rotateX(-Math.PI / 2);
+        const posAttr = terrainGeo.attributes.position;
+        for (let i = 0; i < posAttr.count; i++) {
+            const vx = posAttr.getX(i);
+            const vz = posAttr.getZ(i);
+            posAttr.setY(i, getTerrainHeight(vx, vz));
+        }
+        terrainGeo.computeVertexNormals();
+
+        const normAttr = terrainGeo.attributes.normal;
+        const colors = [];
+        const colorTmp = new THREE.Color();
+
+        for (let i = 0; i < posAttr.count; i++) {
+            const vx = posAttr.getX(i);
+            const vy = posAttr.getY(i);
+            const vz = posAttr.getZ(i);
+            const ny = normAttr.getY(i);
+            const centerDist = Math.hypot(vx, vz);
+            const micro = (Math.sin(vx * 0.21) * Math.cos(vz * 0.21)) * 0.04;
+
+            if (vy < 0.4) {
+                colorTmp.setRGB(0.84 + micro, 0.74 + micro, 0.52);
+            } else if (centerDist < 16) {
+                colorTmp.setRGB(0.68 + micro, 0.62 + micro, 0.51 + micro);
+            } else if (vy > 18.0) {
+                colorTmp.setRGB(0.93, 0.95, 0.98);
+            } else if (ny < 0.77 || vy > 11.2) {
+                colorTmp.setRGB(0.49 + micro, 0.46 + micro, 0.42 + micro);
+            } else if (vz > 68) {
+                colorTmp.setRGB(0.38 + micro, 0.29 + micro, 0.23);
+            } else {
+                const lush = Math.sin(vx * 0.07) * Math.cos(vz * 0.07) * 0.055;
+                colorTmp.setRGB(0.28 + lush + micro, 0.51 + lush + micro, 0.19 + micro);
+            }
+            colors.push(colorTmp.r, colorTmp.g, colorTmp.b);
+        }
+        terrainGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+
+        const terrainMat = new THREE.MeshStandardMaterial({
+            vertexColors: true,
+            roughness: 0.86,
+            metalness: 0.03
+        });
+        const terrainMesh = new THREE.Mesh(terrainGeo, terrainMat);
+        terrainMesh.receiveShadow = true;
+        scene.add(terrainMesh);
+
+        // Instanced Wildflower & Lush Grass Meadow (Directly inspired by sample1.jpg!)
+        function populateWildflowerMeadow() {
+            const flowerColors = [0xa855f7, 0xef4444, 0xfacc15, 0xf97316, 0xec4899, 0x60a5fa];
+            const bladeGeo = new THREE.ConeGeometry(0.18, 0.65, 4);
+            bladeGeo.translate(0, 0.32, 0);
+            const grassMat = new THREE.MeshLambertMaterial({ color: 0x4d8c32 });
+            const grassInst = new THREE.InstancedMesh(bladeGeo, grassMat, 1800);
+
+            const dummy = new THREE.Object3D();
+            let gIdx = 0;
+            for (let i = 0; i < 1800; i++) {
+                const a = Math.random() * Math.PI * 2;
+                const r = 14 + Math.random() * 78;
+                const gx = Math.cos(a) * r;
+                const gz = Math.sin(a) * r;
+                const gy = getTerrainHeight(gx, gz);
+                if (gy < 1.2 || gy > 10.5) continue;
+                dummy.position.set(gx, gy, gz);
+                dummy.rotation.set((Math.random() - 0.5) * 0.25, Math.random() * Math.PI, (Math.random() - 0.5) * 0.25);
+                const s = 0.7 + Math.random() * 0.9;
+                dummy.scale.set(s, s, s);
+                dummy.updateMatrix();
+                grassInst.setMatrixAt(gIdx++, dummy.matrix);
+            }
+            scene.add(grassInst);
+
+            const blossomGeo = new THREE.DodecahedronGeometry(0.16, 0);
+            flowerColors.forEach(hex => {
+                const fMat = new THREE.MeshBasicMaterial({ color: hex });
+                const fInst = new THREE.InstancedMesh(blossomGeo, fMat, 140);
+                for (let j = 0; j < 140; j++) {
+                    const a = Math.random() * Math.PI * 2;
+                    const r = 15 + Math.random() * 68;
+                    const fx = Math.cos(a) * r;
+                    const fz = Math.sin(a) * r;
+                    const fy = getTerrainHeight(fx, fz);
+                    if (fy < 1.4 || fy > 9.5) continue;
+                    dummy.position.set(fx, fy + 0.38, fz);
+                    dummy.scale.setScalar(0.8 + Math.random() * 0.7);
+                    dummy.updateMatrix();
+                    fInst.setMatrixAt(j, dummy.matrix);
+                }
+                scene.add(fInst);
+            });
+        }
+        populateWildflowerMeadow();
+
+        // Water Surface
+        const waterGeo = new THREE.PlaneGeometry(460, 460, 48, 48);
+        waterGeo.rotateX(-Math.PI / 2);
+        const waterMat = new THREE.MeshStandardMaterial({
+            color: 0x1b6ca8,
+            roughness: 0.14,
+            metalness: 0.42,
+            transparent: true,
+            opacity: 0.88
+        });
+        const waterMesh = new THREE.Mesh(waterGeo, waterMat);
+        waterMesh.position.y = -0.15;
+        scene.add(waterMesh);
+
+        // Terrain-Hugging Glowing Emerald/Gold Influence Ribbon (Directly like sample12.png!)
+        const influenceRibbonGroup = new THREE.Group();
+        scene.add(influenceRibbonGroup);
+
+        function updateInfluenceRing() {
+            while (influenceRibbonGroup.children.length > 0) influenceRibbonGroup.remove(influenceRibbonGroup.children[0]);
+            const radius = EPOCHS[state.epochIndex].influenceRadius;
+            const segs = 128;
+            const ringColor = state.alignment < -20 ? 0xef4444 : (state.alignment > 20 ? 0x38bdf8 : 0x4ade80);
+
+            const pts = [];
+            for (let i = 0; i <= segs; i++) {
+                const a = (i / segs) * Math.PI * 2;
+                const rx = Math.cos(a) * radius;
+                const rz = Math.sin(a) * radius;
+                const ry = Math.max(0.2, getTerrainHeight(rx, rz) + 0.32);
+                pts.push(new THREE.Vector3(rx, ry, rz));
+            }
+            const curve = new THREE.CatmullRomCurve3(pts, true);
+            const tubeGeo = new THREE.TubeGeometry(curve, 128, 0.55, 8, true);
+            const tubeMat = new THREE.MeshBasicMaterial({ color: ringColor, transparent: true, opacity: 0.75 });
+            const outerGlowGeo = new THREE.TubeGeometry(curve, 128, 1.35, 8, true);
+            const outerGlowMat = new THREE.MeshBasicMaterial({ color: ringColor, transparent: true, opacity: 0.24 });
+            influenceRibbonGroup.add(new THREE.Mesh(tubeGeo, tubeMat), new THREE.Mesh(outerGlowGeo, outerGlowMat));
+        }
+        updateInfluenceRing();
+
+        //        // ============================================================================
+        // 5. ANATOMICALLY SCULPTED 3D HUMAN HAND OF GOD IN VOLUMETRIC CLOUD MIST
+        //    Modeled directly after sample1.jpg & sample13.jpg
+        // ============================================================================
+        const handGroup = new THREE.Group();
+        const handSkinTex = AssetForge.createHandSkinTexture();
+        const cloudMistTex = AssetForge.createCloudMistSpriteTexture();
+
+        const handRig = {
+            wrist: new THREE.Group(),
+            fingers: [],
+            thumb: null,
+            cloudSprites: [],
+            palmOrb: null,
+            skinMat: new THREE.MeshStandardMaterial({
+                map: handSkinTex,
+                roughness: 0.42,
+                metalness: 0.06,
+                emissive: new THREE.Color(0x553311),
+                emissiveIntensity: 0.14
+            }),
+            nailMat: new THREE.MeshStandardMaterial({ color: 0xfbe4d5, roughness: 0.25, metalness: 0.1 }),
+            auraLight: new THREE.PointLight(0x67e8f9, 1.35, 22),
+            curlTarget: 0.22,
+            curlCurrent: 0.22
+        };
+
+        function buildArticulatedHandOfGod() {
+            handGroup.add(handRig.wrist);
+            handRig.wrist.position.set(0, 3.6, 0);
+            handRig.wrist.rotation.x = 0.32;
+
+            // 1. Sculpted Organic Metacarpal Palm
+            const palmCore = new THREE.Mesh(new THREE.SphereGeometry(1.08, 24, 20), handRig.skinMat);
+            palmCore.scale.set(0.96, 0.42, 1.12);
+            palmCore.castShadow = true;
+            handRig.wrist.add(palmCore);
+
+            const knuckleBridge = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 1.56, 16), handRig.skinMat);
+            knuckleBridge.rotation.z = Math.PI / 2;
+            knuckleBridge.position.set(0, 0.02, -0.88);
+            knuckleBridge.scale.set(1, 1, 0.72);
+            handRig.wrist.add(knuckleBridge);
+
+            const thenarPad = new THREE.Mesh(new THREE.SphereGeometry(0.54, 16, 14), handRig.skinMat);
+            thenarPad.scale.set(0.85, 0.55, 1.25);
+            thenarPad.position.set(-0.62, -0.14, 0.12);
+            thenarPad.rotation.y = 0.4;
+            handRig.wrist.add(thenarPad);
+
+            const wristNeck = new THREE.Mesh(new THREE.CylinderGeometry(0.68, 0.58, 1.65, 20), handRig.skinMat);
+            wristNeck.rotation.x = Math.PI / 2.2;
+            wristNeck.position.set(0, 0.25, 1.45);
+            handRig.wrist.add(wristNeck);
+
+            // 2. Five Anatomically Tapered Fingers with Smooth Joints & Fingernails
+            const fingerSpecs = [
+                { x: -0.66, y: 0.01, z: -0.92, spread:  0.08, len: 0.68, r: 0.185 },
+                { x: -0.22, y: 0.04, z: -1.00, spread:  0.02, len: 0.76, r: 0.195 },
+                { x:  0.23, y: 0.02, z: -0.95, spread: -0.03, len: 0.70, r: 0.185 },
+                { x:  0.64, y: -0.03, z: -0.82, spread: -0.10, len: 0.56, r: 0.155 }
+            ];
+
+            fingerSpecs.forEach((spec) => {
+                const knucklePivot = new THREE.Group();
+                knucklePivot.position.set(spec.x, spec.y, spec.z);
+                knucklePivot.rotation.y = spec.spread;
+                handRig.wrist.add(knucklePivot);
+
+                const kJoint = new THREE.Mesh(new THREE.SphereGeometry(spec.r * 1.04, 14, 14), handRig.skinMat);
+                knucklePivot.add(kJoint);
+
+                const prox = new THREE.Mesh(new THREE.CylinderGeometry(spec.r * 0.88, spec.r * 1.02, spec.len, 16), handRig.skinMat);
+                prox.rotation.x = Math.PI / 2;
+                prox.position.z = -spec.len / 2;
+                prox.castShadow = true;
+                knucklePivot.add(prox);
+
+                const midPivot = new THREE.Group();
+                midPivot.position.z = -spec.len;
+                knucklePivot.add(midPivot);
+
+                const mJoint = new THREE.Mesh(new THREE.SphereGeometry(spec.r * 0.88, 14, 14), handRig.skinMat);
+                midPivot.add(mJoint);
+
+                const midLen = spec.len * 0.78;
+                const midMesh = new THREE.Mesh(new THREE.CylinderGeometry(spec.r * 0.76, spec.r * 0.88, midLen, 16), handRig.skinMat);
+                midMesh.rotation.x = Math.PI / 2;
+                midMesh.position.z = -midLen / 2;
+                midMesh.castShadow = true;
+                midPivot.add(midMesh);
+
+                const tipPivot = new THREE.Group();
+                tipPivot.position.z = -midLen;
+                midPivot.add(tipPivot);
+
+                const tJoint = new THREE.Mesh(new THREE.SphereGeometry(spec.r * 0.76, 12, 12), handRig.skinMat);
+                tipPivot.add(tJoint);
+
+                const tipLen = spec.len * 0.65;
+                const tipMesh = new THREE.Mesh(new THREE.CylinderGeometry(spec.r * 0.62, spec.r * 0.76, tipLen, 16), handRig.skinMat);
+                tipMesh.rotation.x = Math.PI / 2;
+                tipMesh.position.z = -tipLen / 2;
+                tipPivot.add(tipMesh);
+
+                const fingerPad = new THREE.Mesh(new THREE.SphereGeometry(spec.r * 0.64, 14, 14), handRig.skinMat);
+                fingerPad.scale.set(1.0, 0.82, 1.15);
+                fingerPad.position.z = -tipLen;
+                tipPivot.add(fingerPad);
+
+                const nail = new THREE.Mesh(new THREE.BoxGeometry(spec.r * 0.88, 0.03, tipLen * 0.55), handRig.nailMat);
+                nail.position.set(0, spec.r * 0.54, -tipLen * 0.72);
+                nail.rotation.x = 0.08;
+                tipPivot.add(nail);
+
+                handRig.fingers.push({ knucklePivot, midPivot, tipPivot, baseSpread: spec.spread });
+            });
+
+            // 3. Sculpted Opposable Thumb with Nail
+            const thumbBase = new THREE.Group();
+            thumbBase.position.set(-0.88, -0.10, -0.18);
+            thumbBase.rotation.set(0.15, 0.68, -0.25);
+            handRig.wrist.add(thumbBase);
+
+            const thumbProx = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.24, 0.65, 16), handRig.skinMat);
+            thumbProx.rotation.x = Math.PI / 2;
+            thumbProx.position.z = -0.32;
+            thumbBase.add(thumbProx);
+
+            const thumbTipPivot = new THREE.Group();
+            thumbTipPivot.position.z = -0.65;
+            thumbBase.add(thumbTipPivot);
+
+            const thumbJoint = new THREE.Mesh(new THREE.SphereGeometry(0.19, 12, 12), handRig.skinMat);
+            thumbTipPivot.add(thumbJoint);
+
+            const thumbDist = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.19, 0.56, 16), handRig.skinMat);
+            thumbDist.rotation.x = Math.PI / 2;
+            thumbDist.position.z = -0.28;
+            thumbTipPivot.add(thumbDist);
+
+            const thumbPad = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 12), handRig.skinMat);
+            thumbPad.position.z = -0.56;
+            thumbTipPivot.add(thumbPad);
+
+            const thumbNail = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.03, 0.28), handRig.nailMat);
+            thumbNail.position.set(0, 0.13, -0.42);
+            thumbTipPivot.add(thumbNail);
+
+            handRig.thumb = { thumbBase, thumbTipPivot };
+
+            // 4. Glowing Magical Energy Orb held in the Hand (sample1.jpg)
+            const orbGroup = new THREE.Group();
+            orbGroup.position.set(0, -0.32, -0.55);
+            const innerOrb = new THREE.Mesh(
+                new THREE.SphereGeometry(0.46, 20, 20),
+                new THREE.MeshBasicMaterial({ color: 0xe0f2fe, transparent: true, opacity: 0.85 })
+            );
+            const outerAuraOrb = new THREE.Mesh(
+                new THREE.SphereGeometry(0.76, 20, 20),
+                new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.32, wireframe: true })
+            );
+            orbGroup.add(innerOrb, outerAuraOrb);
+            handRig.wrist.add(orbGroup);
+            handRig.palmOrb = orbGroup;
+
+            // 5. Billowing Volumetric Cloud Mist around Wrist & Hand (sample1.jpg & sample13.jpg)
+            for (let i = 0; i < 16; i++) {
+                const sMat = new THREE.SpriteMaterial({
+                    map: cloudMistTex,
+                    color: 0xdbeafe,
+                    transparent: true,
+                    opacity: 0.62,
+                    depthWrite: false,
+                    blending: THREE.AdditiveBlending
+                });
+                const sp = new THREE.Sprite(sMat);
+                const angle = (i / 16) * Math.PI * 2;
+                const rad = 0.45 + (i % 3) * 0.42;
+                sp.position.set(
+                    Math.cos(angle) * rad,
+                    0.15 + (Math.random() - 0.5) * 0.45,
+                    1.15 + Math.sin(angle) * 0.65 + (i % 2) * 0.4
+                );
+                const sz = 2.1 + (i % 4) * 0.55;
+                sp.scale.set(sz, sz, 1);
+                sp.userData = { baseAngle: angle, rad, baseZ: sp.position.z, speed: 0.8 + Math.random() * 0.8, phase: i * 0.6 };
+                handRig.wrist.add(sp);
+                handRig.cloudSprites.push(sp);
+            }
+
+            const groundRing = new THREE.Mesh(
+                new THREE.RingGeometry(1.2, 1.75, 40),
+                new THREE.MeshBasicMaterial({ color: 0x7dd3fc, side: THREE.DoubleSide, transparent: true, opacity: 0.52 })
+            );
+            groundRing.rotation.x = -Math.PI / 2;
+            groundRing.position.y = 0.14;
+            handGroup.add(groundRing);
+
+            handRig.auraLight.position.set(0, 2.2, 0);
+            handGroup.add(handRig.auraLight);
+            scene.add(handGroup);
+        }
+        buildArticulatedHandOfGod();
+
+        let isDrawingGesture = false;
+
+        function animateHandOfGod(dt, now) {
+            if (state.heldObject) {
+                handRig.curlTarget = 1.08;
+            } else if (isDrawingGesture) {
+                handRig.curlTarget = 0.88;
+            } else if (state.hoveredEntity) {
+                handRig.curlTarget = 0.45;
+            } else {
+                handRig.curlTarget = 0.26 + Math.sin(now * 0.0028) * 0.06;
+            }
+
+            handRig.curlCurrent += (handRig.curlTarget - handRig.curlCurrent) * Math.min(1, dt * 12);
+
+            handRig.wrist.position.y = 3.55 + Math.sin(now * 0.0032) * 0.16;
+            handRig.wrist.rotation.z = Math.sin(now * 0.0018) * 0.05;
+
+            handRig.fingers.forEach((f, idx) => {
+                const wave = Math.sin(now * 0.004 + idx * 0.55) * 0.04;
+                const c = (isDrawingGesture && idx === 0) ? 0.05 : (handRig.curlCurrent + wave);
+                f.knucklePivot.rotation.x = -c * 0.72;
+                f.midPivot.rotation.x = -c * 0.96;
+                f.tipPivot.rotation.x = -c * 0.68;
+            });
+
+            if (handRig.thumb) {
+                handRig.thumb.thumbBase.rotation.x = 0.15 - handRig.curlCurrent * 0.48;
+                handRig.thumb.thumbBase.rotation.z = -0.25 - handRig.curlCurrent * 0.42;
+                handRig.thumb.thumbTipPivot.rotation.x = -handRig.curlCurrent * 0.65;
+            }
+
+            if (handRig.palmOrb) {
+                handRig.palmOrb.rotation.y += dt * 1.8;
+                handRig.palmOrb.rotation.z -= dt * 1.2;
+                const orbScale = state.heldObject ? 0.01 : (isDrawingGesture || state.hoveredEntity ? 1.15 : 0.78);
+                handRig.palmOrb.scale.setScalar(orbScale + Math.sin(now * 0.006) * 0.06);
+            }
+
+            const cloudTint = state.alignment < -25 ? 0xfca5a5 : (state.alignment > 25 ? 0xbae6fd : 0xe0f2fe);
+            handRig.cloudSprites.forEach((sp) => {
+                const u = sp.userData;
+                const a = u.baseAngle + now * 0.0008 * u.speed;
+                sp.position.x = Math.cos(a) * u.rad;
+                sp.position.y = 0.15 + Math.sin(now * 0.003 + u.phase) * 0.22;
+                sp.material.color.setHex(cloudTint);
+            });
+        }
+
+        //        // ============================================================================
+        // 6. CLASSICAL DOMED TEMPLE, TOWN CENTER PLAZA & MULTI-STAGE BUILDINGS
+        // ============================================================================
+        const buildings = [];
+        const resourcesNodes = [];
+        const villagers = [];
+        const roadDecals = [];
+        const particles = [];
+
+        const roofTileTex = AssetForge.createRoofTileTexture();
+        const verdiDomeTex = AssetForge.createVerdiDomeTexture();
+        const wallFacadeTex = AssetForge.createClassicalWallTexture();
+        const cobbleRoadTex = AssetForge.createCobbleRoadTexture();
+        const fireSpriteTex = AssetForge.createFireSmokeTexture(true);
+        const smokeSpriteTex = AssetForge.createFireSmokeTexture(false);
+
+        const sharedMats = {
+            marble: new THREE.MeshStandardMaterial({ color: 0xf3efe6, roughness: 0.38 }),
+            facade: new THREE.MeshStandardMaterial({ map: wallFacadeTex, roughness: 0.72 }),
+            terracotta: new THREE.MeshStandardMaterial({ map: roofTileTex, roughness: 0.55 }),
+            verdiDome: new THREE.MeshStandardMaterial({ map: verdiDomeTex, roughness: 0.42, metalness: 0.35 }),
+            goldTrim: new THREE.MeshStandardMaterial({ color: 0xf5c542, metalness: 0.78, roughness: 0.22 }),
+            timber: new THREE.MeshStandardMaterial({ color: 0x5c3a1e, roughness: 0.85 }),
+            scaffold: new THREE.MeshStandardMaterial({ color: 0xc89d66, roughness: 0.8 }),
+            stone: new THREE.MeshStandardMaterial({ color: 0x7c8288, roughness: 0.78 }),
+            cobble: new THREE.MeshStandardMaterial({ map: cobbleRoadTex, roughness: 0.85 }),
+            charred: new THREE.MeshStandardMaterial({ color: 0x242220, roughness: 0.95 }),
+            wheat: new THREE.MeshStandardMaterial({ color: 0xeab308, roughness: 0.65 }),
+            skin: new THREE.MeshStandardMaterial({ color: 0xf1c29d, roughness: 0.55 }),
+            hairDark: new THREE.MeshStandardMaterial({ color: 0x271c15, roughness: 0.85 }),
+            innerSanctuaryGlow: new THREE.MeshBasicMaterial({ color: 0xffd56b })
+        };
+
+        function createCobbleRoadTo(targetX, targetZ) {
+            const dist = Math.hypot(targetX, targetZ);
+            if (dist < 5) return;
+            const steps = Math.floor(dist / 2.2);
+            for (let i = 1; i <= steps; i++) {
+                const t = i / steps;
+                const rx = targetX * t + Math.sin(t * Math.PI) * 0.9;
+                const rz = targetZ * t;
+                const ry = getTerrainHeight(rx, rz);
+                const roadTile = new THREE.Mesh(new THREE.CylinderGeometry(1.55, 1.65, 0.10, 12), sharedMats.cobble);
+                roadTile.position.set(rx, ry + 0.03, rz);
+                roadTile.receiveShadow = true;
+                scene.add(roadTile);
+                roadDecals.push(roadTile);
+            }
+        }
+
+        const templeGroup = new THREE.Group();
+        scene.add(templeGroup);
+
+        function rebuildTempleMesh() {
+            while (templeGroup.children.length > 0) templeGroup.remove(templeGroup.children[0]);
+            const epochId = EPOCHS[state.epochIndex].id;
+            templeGroup.position.set(-14, getTerrainHeight(-14, -4), -4);
+
+            const podium = new THREE.Mesh(new THREE.BoxGeometry(11.5, 2.2, 13.5), sharedMats.marble);
+            podium.position.y = 1.1;
+            podium.castShadow = true;
+            podium.receiveShadow = true;
+            templeGroup.add(podium);
+
+            for (let st = 0; st < 5; st++) {
+                const stair = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.42, 0.9), sharedMats.marble);
+                stair.position.set(0, st * 0.42 + 0.21, 7.2 - st * 0.45);
+                templeGroup.add(stair);
+            }
+
+            [-3.4, 3.4].forEach(bx => {
+                const pedestal = new THREE.Mesh(new THREE.BoxGeometry(1.3, 2.8, 1.3), sharedMats.marble);
+                pedestal.position.set(bx, 1.4, 7.2);
+                const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 0.4, 0.7, 12), sharedMats.goldTrim);
+                bowl.position.set(bx, 3.1, 7.2);
+                const flame = new THREE.Sprite(new THREE.SpriteMaterial({ map: fireSpriteTex, blending: THREE.AdditiveBlending }));
+                flame.position.set(bx, 4.1, 7.2);
+                flame.scale.set(2.4, 2.8, 1);
+                templeGroup.add(pedestal, bowl, flame);
+            });
+
+            const hall = new THREE.Mesh(new THREE.BoxGeometry(8.6, 5.2, 8.8), sharedMats.facade);
+            hall.position.set(0, 4.8, -0.5);
+            hall.castShadow = true;
+            templeGroup.add(hall);
+
+            [-3.2, -1.1, 1.1, 3.2].forEach(cx => {
+                const col = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.44, 5.2, 14), sharedMats.marble);
+                col.position.set(cx, 4.8, 5.2);
+                col.castShadow = true;
+                templeGroup.add(col);
+            });
+
+            const porticoRoof = new THREE.Mesh(new THREE.ConeGeometry(5.8, 2.2, 4), sharedMats.verdiDome);
+            porticoRoof.rotation.y = Math.PI / 4;
+            porticoRoof.scale.set(1.05, 1, 0.85);
+            porticoRoof.position.set(0, 8.4, 3.6);
+            templeGroup.add(porticoRoof);
+
+            const innerGlowCore = new THREE.Mesh(new THREE.CylinderGeometry(3.1, 3.1, 3.4, 16), sharedMats.innerSanctuaryGlow);
+            innerGlowCore.position.set(0, 9.1, -1.2);
+            templeGroup.add(innerGlowCore);
+
+            const rotundaCols = 12;
+            for (let i = 0; i < rotundaCols; i++) {
+                const a = (i / rotundaCols) * Math.PI * 2;
+                const rCol = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.30, 3.5, 10), sharedMats.marble);
+                rCol.position.set(Math.cos(a) * 3.65, 9.1, -1.2 + Math.sin(a) * 3.65);
+                templeGroup.add(rCol);
+            }
+
+            const dome = new THREE.Mesh(
+                new THREE.SphereGeometry(4.15, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.52),
+                epochId >= 4 ? sharedMats.goldTrim : sharedMats.verdiDome
+            );
+            dome.position.set(0, 10.8, -1.2);
+            dome.castShadow = true;
+            templeGroup.add(dome);
+
+            const oculus = new THREE.Mesh(new THREE.TorusGeometry(0.85, 0.22, 10, 24), sharedMats.goldTrim);
+            oculus.rotation.x = Math.PI / 2;
+            oculus.position.set(0, 14.8, -1.2);
+            templeGroup.add(oculus);
+
+            const plazaGroup = new THREE.Group();
+            plazaGroup.position.set(16, 0, -2);
+            for (let s = 0; s < 4; s++) {
+                const stepDisc = new THREE.Mesh(new THREE.CylinderGeometry(8.5 - s * 1.1, 9.0 - s * 1.1, 0.36, 32), sharedMats.marble);
+                stepDisc.position.y = s * 0.36 + 0.18;
+                stepDisc.receiveShadow = true;
+                plazaGroup.add(stepDisc);
+            }
+            const centralAltar = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1.8, 3.2), sharedMats.facade);
+            centralAltar.position.y = 2.3;
+            plazaGroup.add(centralAltar);
+
+            const beaconBeam = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.65, 1.45, 85, 16, 1, true),
+                new THREE.MeshBasicMaterial({ color: 0x67e8f9, transparent: true, opacity: 0.24, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false })
+            );
+            beaconBeam.position.y = 44;
+            beaconBeam.name = 'manaCrystal';
+            plazaGroup.add(beaconBeam);
+
+            templeGroup.add(plazaGroup);
+        }
+        rebuildTempleMesh();
+
+        //        function createDetailedBuilding(type, x, z, isPrebuilt = false) {
+            const y = getTerrainHeight(x, z);
+            const root = new THREE.Group();
+            root.position.set(x, y, z);
+
+            const foundation = new THREE.Mesh(new THREE.BoxGeometry(5.6, 0.55, 5.0), sharedMats.stone);
+            foundation.position.y = 0.27;
+            foundation.receiveShadow = true;
+            root.add(foundation);
+
+            const scaffoldGroup = new THREE.Group();
+            const postCoords = [[-2.6, -2.2], [2.6, -2.2], [-2.6, 2.2], [2.6, 2.2], [0, -2.2], [0, 2.2]];
+            postCoords.forEach(([px, pz]) => {
+                const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 4.6, 6), sharedMats.scaffold);
+                pole.position.set(px, 2.3, pz);
+                scaffoldGroup.add(pole);
+            });
+            for (let h = 1.3; h <= 3.9; h += 1.3) {
+                const plankF = new THREE.Mesh(new THREE.BoxGeometry(5.4, 0.10, 0.45), sharedMats.scaffold);
+                plankF.position.set(0, h, 2.2);
+                const plankB = plankF.clone(); plankB.position.z = -2.2;
+                scaffoldGroup.add(plankF, plankB);
+            }
+
+            // Rotating Treadwheel Crane
+            const cranePivot = new THREE.Group();
+            cranePivot.position.set(-2.9, 0.5, 0);
+            const craneMast = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.20, 5.4, 8), sharedMats.timber);
+            craneMast.position.y = 2.7;
+            const craneBoom = new THREE.Mesh(new THREE.BoxGeometry(3.8, 0.18, 0.18), sharedMats.timber);
+            craneBoom.position.set(1.4, 5.2, 0);
+            craneBoom.rotation.z = 0.22;
+            const craneRope = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 2.2, 6), sharedMats.scaffold);
+            craneRope.position.set(2.9, 4.3, 0);
+            const suspendedBlock = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.45, 0.45), sharedMats.marble);
+            suspendedBlock.position.set(2.9, 3.1, 0);
+            cranePivot.add(craneMast, craneBoom, craneRope, suspendedBlock);
+            scaffoldGroup.add(cranePivot);
+            root.add(scaffoldGroup);
+
+            const mainGroup = new THREE.Group();
+            const raftersGroup = new THREE.Group();
+            const roofGroup = new THREE.Group();
+            let windmillSails = null;
+
+            for (let rx = -1.6; rx <= 1.6; rx += 0.8) {
+                const trussL = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.9, 0.12), sharedMats.timber);
+                trussL.position.set(rx, 3.3, -0.65);
+                trussL.rotation.x = 0.65;
+                const trussR = trussL.clone();
+                trussR.position.z = 0.65;
+                trussR.rotation.x = -0.65;
+                raftersGroup.add(trussL, trussR);
+            }
+            mainGroup.add(raftersGroup);
+
+            if (type === 'house') {
+                const lowerBody = new THREE.Mesh(new THREE.BoxGeometry(4.2, 2.6, 3.6), sharedMats.facade);
+                lowerBody.position.y = 1.6;
+                lowerBody.castShadow = true;
+                mainGroup.add(lowerBody);
+
+                const sideWing = new THREE.Mesh(new THREE.BoxGeometry(2.2, 2.0, 2.4), sharedMats.facade);
+                sideWing.position.set(1.8, 1.3, 1.2);
+                sideWing.castShadow = true;
+                mainGroup.add(sideWing);
+
+                [-1.5, -0.5, 0.5].forEach(cx => {
+                    const porchCol = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 1.8, 8), sharedMats.marble);
+                    porchCol.position.set(cx, 1.2, 2.1);
+                    mainGroup.add(porchCol);
+                });
+
+                const chimney = new THREE.Mesh(new THREE.BoxGeometry(0.65, 4.1, 0.65), sharedMats.stone);
+                chimney.position.set(-1.35, 2.35, -0.9);
+                mainGroup.add(chimney);
+
+                const mainRoof = new THREE.Mesh(new THREE.ConeGeometry(3.45, 1.65, 4), sharedMats.terracotta);
+                mainRoof.rotation.y = Math.PI / 4;
+                mainRoof.scale.set(1.08, 1, 0.95);
+                mainRoof.position.y = 3.65;
+                mainRoof.castShadow = true;
+
+                const wingRoof = new THREE.Mesh(new THREE.ConeGeometry(2.0, 1.1, 4), sharedMats.terracotta);
+                wingRoof.rotation.y = Math.PI / 4;
+                wingRoof.position.set(1.8, 2.8, 1.2);
+                roofGroup.add(mainRoof, wingRoof);
+
+                state.resources.maxPop += 4;
+            } else if (type === 'mill') {
+                const lowerBase = new THREE.Mesh(new THREE.CylinderGeometry(1.75, 2.1, 2.3, 12), sharedMats.stone);
+                lowerBase.position.y = 1.4;
+                lowerBase.castShadow = true;
+                const upperTower = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.75, 2.5, 12), sharedMats.facade);
+                upperTower.position.y = 3.7;
+                upperTower.castShadow = true;
+                mainGroup.add(lowerBase, upperTower);
+
+                const domeCap = new THREE.Mesh(new THREE.ConeGeometry(1.65, 1.5, 12), sharedMats.terracotta);
+                domeCap.position.y = 5.65;
+                roofGroup.add(domeCap);
+
+                windmillSails = new THREE.Group();
+                windmillSails.position.set(0, 4.2, 1.65);
+                for (let s = 0; s < 4; s++) {
+                    const armGroup = new THREE.Group();
+                    armGroup.rotation.z = (Math.PI / 2) * s;
+                    const spar = new THREE.Mesh(new THREE.BoxGeometry(0.16, 4.2, 0.12), sharedMats.timber);
+                    const cloth = new THREE.Mesh(new THREE.BoxGeometry(0.62, 3.2, 0.04), sharedMats.marble);
+                    cloth.position.set(0.24, 0.3, 0.04);
+                    armGroup.add(spar, cloth);
+                    windmillSails.add(armGroup);
+                }
+                roofGroup.add(windmillSails);
+
+                for (let wx = -1; wx <= 1; wx++) {
+                    for (let wz = -1; wz <= 1; wz++) {
+                        if (wx === 0 && wz === 0) continue;
+                        const field = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.42, 2.2), sharedMats.wheat);
+                        field.position.set(wx * 2.8, 0.25, wz * 2.8);
+                        field.receiveShadow = true;
+                        root.add(field);
+                    }
+                }
+            } else if (type === 'warehouse') {
+                const hall = new THREE.Mesh(new THREE.BoxGeometry(4.6, 2.6, 3.6), sharedMats.facade);
+                hall.position.y = 1.55;
+                hall.castShadow = true;
+                mainGroup.add(hall);
+                for (let c = 0; c < 4; c++) {
+                    const crate = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.7), sharedMats.scaffold);
+                    crate.position.set(-1.5 + c * 0.95, 0.85, 2.1);
+                    mainGroup.add(crate);
+                }
+                const roof = new THREE.Mesh(new THREE.ConeGeometry(3.6, 1.6, 4), sharedMats.terracotta);
+                roof.rotation.y = Math.PI / 4;
+                roof.position.y = 3.6;
+                roofGroup.add(roof);
+            } else if (type === 'barracks') {
+                const keep = new THREE.Mesh(new THREE.BoxGeometry(4.8, 3.0, 4.0), sharedMats.stone);
+                keep.position.y = 1.75;
+                keep.castShadow = true;
+                mainGroup.add(keep);
+                [[-2.2, -1.8], [2.2, -1.8], [-2.2, 1.8], [2.2, 1.8]].forEach(([tx, tz]) => {
+                    const tower = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.78, 4.2, 10), sharedMats.stone);
+                    tower.position.set(tx, 2.35, tz);
+                    tower.castShadow = true;
+                    mainGroup.add(tower);
+                    const tRoof = new THREE.Mesh(new THREE.ConeGeometry(0.88, 1.1, 10), sharedMats.terracotta);
+                    tRoof.position.set(tx, 4.95, tz);
+                    roofGroup.add(tRoof);
+                });
+            } else if (type === 'shrine') {
+                const podium = new THREE.Mesh(new THREE.CylinderGeometry(2.1, 2.4, 1.2, 16), sharedMats.marble);
+                podium.position.y = 0.85;
+                mainGroup.add(podium);
+                for (let c = 0; c < 8; c++) {
+                    const a = (Math.PI * 2 * c) / 8;
+                    const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.20, 0.24, 2.6, 10), sharedMats.marble);
+                    pillar.position.set(Math.cos(a) * 1.65, 2.65, Math.sin(a) * 1.65);
+                    mainGroup.add(pillar);
+                }
+                const dome = new THREE.Mesh(new THREE.SphereGeometry(1.75, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2), sharedMats.verdiDome);
+                dome.position.y = 3.95;
+                roofGroup.add(dome);
+            }
+
+            mainGroup.add(roofGroup);
+            root.add(mainGroup);
+
+            const fireSmokeGroup = new THREE.Group();
+            const fireSprites = [];
+            for (let f = 0; f < 4; f++) {
+                const fs = new THREE.Sprite(new THREE.SpriteMaterial({ map: fireSpriteTex, blending: THREE.AdditiveBlending, transparent: true }));
+                fs.position.set((f - 1.5) * 0.9, 1.8 + (f % 2) * 0.8, (f % 2 === 0 ? 1 : -1) * 0.8);
+                fs.scale.set(2.2, 2.6, 1);
+                fireSmokeGroup.add(fs);
+                fireSprites.push(fs);
+            }
+            const smokeSprites = [];
+            for (let sm = 0; sm < 5; sm++) {
+                const ss = new THREE.Sprite(new THREE.SpriteMaterial({ map: smokeSpriteTex, transparent: true, opacity: 0.65 }));
+                ss.position.set((Math.random() - 0.5) * 1.8, 3.2 + sm * 1.1, (Math.random() - 0.5) * 1.8);
+                ss.scale.set(2.8 + sm * 0.5, 2.8 + sm * 0.5, 1);
+                ss.userData = { baseY: ss.position.y, offset: sm * 1.3 };
+                fireSmokeGroup.add(ss);
+                smokeSprites.push(ss);
+            }
+            fireSmokeGroup.visible = false;
+            root.add(fireSmokeGroup);
+
+            const rubbleGroup = new THREE.Group();
+            for (let r = 0; r < 8; r++) {
+                const a = (r / 8) * Math.PI * 2;
+                const stump = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.7 + (r % 3) * 0.45, 0.45), r % 2 === 0 ? sharedMats.charred : sharedMats.stone);
+                stump.position.set(Math.cos(a) * 1.75, 0.65, Math.sin(a) * 1.45);
+                stump.rotation.y = a + Math.PI / 2;
+                stump.rotation.z = (Math.random() - 0.5) * 0.25;
+                rubbleGroup.add(stump);
+            }
+            rubbleGroup.visible = false;
+            root.add(rubbleGroup);
+
+            const bObj = {
+                type,
+                mesh: root,
+                x, z,
+                buildProgress: isPrebuilt ? 100 : 8,
+                hp: 100,
+                maxHp: 100,
+                state: isPrebuilt ? 'complete' : 'constructing',
+                scaffoldGroup,
+                cranePivot,
+                mainGroup,
+                raftersGroup,
+                roofGroup,
+                fireSmokeGroup,
+                fireSprites,
+                smokeSprites,
+                rubbleGroup,
+                windmillSails
+            };
+
+            root.userData = { entityType: 'building', buildingRef: bObj };
+            updateBuildingVisualState(bObj);
+
+            scene.add(root);
+            createCobbleRoadTo(x, z);
+            buildings.push(bObj);
+            updateHUD();
+            return bObj;
+        }
+
+        function spawnDestructionDebris(x, y, z, count = 16) {
+            for (let i = 0; i < count; i++) {
+                const chunk = new THREE.Mesh(
+                    new THREE.DodecahedronGeometry(0.28 + Math.random() * 0.25, 0),
+                    i % 2 === 0 ? sharedMats.terracotta : sharedMats.charred
+                );
+                chunk.position.set(x + (Math.random() - 0.5) * 2.5, y + 1.5 + Math.random() * 2, z + (Math.random() - 0.5) * 2.5);
+                chunk.userData = {
+                    vx: (Math.random() - 0.5) * 9,
+                    vy: 4 + Math.random() * 7,
+                    vz: (Math.random() - 0.5) * 9,
+                    gravity: 16,
+                    life: 1.6 + Math.random() * 0.8
+                };
+                scene.add(chunk);
+                particles.push(chunk);
+            }
+        }
+
+        function updateBuildingVisualState(b) {
+            if (b.hp <= 0) {
+                if (b.state !== 'ruins') {
+                    spawnDestructionDebris(b.x, b.mesh.position.y, b.z, 24);
+                }
+                b.state = 'ruins';
+                b.mainGroup.visible = false;
+                b.scaffoldGroup.visible = false;
+                b.fireSmokeGroup.visible = true;
+                b.rubbleGroup.visible = true;
+                return;
+            }
+
+            if (b.buildProgress < 100) {
+                b.state = 'constructing';
+                b.scaffoldGroup.visible = true;
+                b.mainGroup.visible = true;
+                b.fireSmokeGroup.visible = false;
+                b.rubbleGroup.visible = false;
+
+                const p = Math.max(0.12, b.buildProgress / 100);
+                b.mainGroup.scale.set(1, Math.min(1, p * 1.15), 1);
+                b.raftersGroup.visible = b.buildProgress >= 45 && b.buildProgress < 88;
+                b.roofGroup.visible = b.buildProgress >= 78;
+            } else {
+                b.mainGroup.visible = true;
+                b.mainGroup.scale.set(1, 1, 1);
+                if (b.hp < 40) {
+                    b.state = 'critical_damage';
+                    b.roofGroup.visible = false;
+                    b.raftersGroup.visible = true;
+                    b.scaffoldGroup.visible = false;
+                    b.fireSmokeGroup.visible = true;
+                    b.rubbleGroup.visible = true;
+                } else if (b.hp < 80) {
+                    b.state = 'damaged';
+                    b.roofGroup.visible = true;
+                    b.raftersGroup.visible = false;
+                    b.scaffoldGroup.visible = false;
+                    b.fireSmokeGroup.visible = true;
+                    b.rubbleGroup.visible = false;
+                } else {
+                    b.state = 'complete';
+                    b.roofGroup.visible = true;
+                    b.raftersGroup.visible = false;
+                    b.scaffoldGroup.visible = false;
+                    b.fireSmokeGroup.visible = false;
+                    b.rubbleGroup.visible = false;
+                }
+            }
+        }
+
+        //        const ROLE_TUNICS = {
+            'Bauer': 0xd97706,
+            'Holzfäller': 0x15803d,
+            'Baumeister': 0x0284c7,
+            'Priester': 0xf8fafc,
+            'Bergarbeiter': 0x64748b
+        };
+
+        function spawnVillager(x, z, role = 'Bauer') {
+            const y = getTerrainHeight(x, z);
+            const vGroup = new THREE.Group();
+            vGroup.position.set(x, y, z);
+
+            const tunicColor = ROLE_TUNICS[role] || 0x0284c7;
+            const tunicMat = new THREE.MeshStandardMaterial({ color: tunicColor, roughness: 0.65 });
+
+            const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.24, 0.68, 10), tunicMat);
+            torso.position.y = 0.88;
+            torso.castShadow = true;
+            vGroup.add(torso);
+
+            const belt = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.23, 0.1, 10), sharedMats.timber);
+            belt.position.y = 0.68;
+            vGroup.add(belt);
+
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.20, 14, 14), sharedMats.skin);
+            head.position.y = 1.42;
+            head.castShadow = true;
+            vGroup.add(head);
+
+            const hair = new THREE.Mesh(new THREE.SphereGeometry(0.21, 12, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), sharedMats.hairDark);
+            hair.position.y = 1.45;
+            vGroup.add(hair);
+
+            const leftArmPivot = new THREE.Group();
+            leftArmPivot.position.set(-0.27, 1.15, 0);
+            const leftArm = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.055, 0.52, 8), sharedMats.skin);
+            leftArm.position.y = -0.24;
+            leftArmPivot.add(leftArm);
+            vGroup.add(leftArmPivot);
+
+            const rightArmPivot = new THREE.Group();
+            rightArmPivot.position.set(0.27, 1.15, 0);
+            const rightArm = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.055, 0.52, 8), sharedMats.skin);
+            rightArm.position.y = -0.24;
+            rightArmPivot.add(rightArm);
+
+            const toolHandle = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.65, 6), sharedMats.timber);
+            toolHandle.rotation.x = Math.PI / 2;
+            toolHandle.position.set(0, -0.46, 0.22);
+            const hammerHead = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.12, 0.24), sharedMats.stone);
+            hammerHead.position.set(0, -0.46, 0.52);
+            rightArmPivot.add(toolHandle, hammerHead);
+            vGroup.add(rightArmPivot);
+
+            const leftLegPivot = new THREE.Group();
+            leftLegPivot.position.set(-0.11, 0.56, 0);
+            const leftLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.065, 0.56, 8), sharedMats.skin);
+            leftLeg.position.y = -0.28;
+            leftLegPivot.add(leftLeg);
+            vGroup.add(leftLegPivot);
+
+            const rightLegPivot = new THREE.Group();
+            rightLegPivot.position.set(0.11, 0.56, 0);
+            const rightLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.065, 0.56, 8), sharedMats.skin);
+            rightLeg.position.y = -0.28;
+            rightLegPivot.add(rightLeg);
+            vGroup.add(rightLegPivot);
+
+            vGroup.userData = {
+                entityType: 'villager',
+                role,
+                tunicMat,
+                limbs: { leftArmPivot, rightArmPivot, leftLegPivot, rightLegPivot },
+                walkPhase: Math.random() * Math.PI * 2,
+                targetX: x + (Math.random() - 0.5) * 14,
+                targetZ: z + (Math.random() - 0.5) * 14,
+                timer: Math.random() * 4,
+                sparkTimer: 0
+            };
+            scene.add(vGroup);
+            villagers.push(vGroup);
+            return vGroup;
+        }
+
+        function setVillagerRole(v, newRole) {
+            v.userData.role = newRole;
+            if (v.userData.tunicMat) {
+                v.userData.tunicMat.color.setHex(ROLE_TUNICS[newRole] || 0x0284c7);
+            }
+        }
+
+        const treeFoliageMaterials = [
+            new THREE.MeshStandardMaterial({ color: 0x2d5a27, roughness: 0.82 }),
+            new THREE.MeshStandardMaterial({ color: 0x1e4620, roughness: 0.85 })
+        ];
+
+        function spawnEnvironmentNodes() {
+            for (let i = 0; i < 105; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const radius = 26 + Math.random() * 98;
+                const tx = Math.cos(angle) * radius;
+                const tz = Math.sin(angle) * radius;
+                const ty = getTerrainHeight(tx, tz);
+                if (ty < 1.2 || ty > 15.5) continue;
+
+                const treeGroup = new THREE.Group();
+                treeGroup.position.set(tx, ty, tz);
+
+                const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.34, 2.4, 8), sharedMats.timber);
+                trunk.position.y = 1.2;
+                trunk.castShadow = true;
+                treeGroup.add(trunk);
+
+                const mat = treeFoliageMaterials[i % 2];
+                for (let layer = 0; layer < 4; layer++) {
+                    const coneR = 1.75 - layer * 0.34;
+                    const coneH = 1.85 - layer * 0.18;
+                    const bough = new THREE.Mesh(new THREE.ConeGeometry(coneR, coneH, 9), mat);
+                    bough.position.y = 2.1 + layer * 1.05;
+                    bough.rotation.y = layer * 0.5;
+                    bough.castShadow = true;
+                    treeGroup.add(bough);
+                }
+
+                const s = 0.85 + Math.random() * 0.45;
+                treeGroup.scale.setScalar(s);
+                treeGroup.userData = { entityType: 'resource', resType: 'wood', amount: 45 };
+                scene.add(treeGroup);
+                resourcesNodes.push(treeGroup);
+            }
+
+            for (let i = 0; i < 24; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const radius = 24 + Math.random() * 88;
+                const ox = Math.cos(angle) * radius;
+                const oz = Math.sin(angle) * radius;
+                const oy = getTerrainHeight(ox, oz);
+                if (oy < 1.5) continue;
+
+                const veinGroup = new THREE.Group();
+                veinGroup.position.set(ox, oy, oz);
+
+                const baseRock = new THREE.Mesh(new THREE.DodecahedronGeometry(1.35, 1), sharedMats.stone);
+                baseRock.scale.set(1.2, 0.75, 1.1);
+                baseRock.position.y = 0.55;
+                baseRock.castShadow = true;
+                veinGroup.add(baseRock);
+
+                for (let k = 0; k < 4; k++) {
+                    const shard = new THREE.Mesh(new THREE.OctahedronGeometry(0.48, 0), sharedMats.goldTrim);
+                    shard.position.set((Math.random() - 0.5) * 1.2, 0.9 + Math.random() * 0.35, (Math.random() - 0.5) * 1.2);
+                    veinGroup.add(shard);
+                }
+
+                veinGroup.userData = { entityType: 'resource', resType: 'ore', amount: 70 };
+                scene.add(veinGroup);
+                resourcesNodes.push(veinGroup);
+            }
+        }
+        spawnEnvironmentNodes();
+
+        function buildTribeCapitals() {
+            const vPos = state.tribes.vikings.pos;
+            vPos.y = getTerrainHeight(vPos.x, vPos.z);
+            const vGroup = new THREE.Group();
+            vGroup.position.copy(vPos);
+            const longhall = new THREE.Mesh(new THREE.BoxGeometry(9.5, 4.0, 5.5), sharedMats.timber);
+            longhall.position.y = 2.0;
+            const vRoof = new THREE.Mesh(new THREE.ConeGeometry(6.8, 3.0, 4), sharedMats.scaffold);
+            vRoof.rotation.y = Math.PI / 4;
+            vRoof.position.y = 5.5;
+            vGroup.add(longhall, vRoof);
+            scene.add(vGroup);
+
+            const jPos = state.tribes.japanese.pos;
+            jPos.y = getTerrainHeight(jPos.x, jPos.z);
+            const jGroup = new THREE.Group();
+            jGroup.position.copy(jPos);
+            for (let tier = 0; tier < 3; tier++) {
+                const b = new THREE.Mesh(new THREE.BoxGeometry(7 - tier * 1.6, 2.0, 7 - tier * 1.6), sharedMats.facade);
+                b.position.y = tier * 2.2 + 1.0;
+                const r = new THREE.Mesh(new THREE.ConeGeometry(5.8 - tier * 1.2, 1.1, 4), sharedMats.verdiDome);
+                r.rotation.y = Math.PI / 4;
+                r.position.y = tier * 2.2 + 2.4;
+                jGroup.add(b, r);
+            }
+            scene.add(jGroup);
+
+            const aPos = state.tribes.aztecs.pos;
+            aPos.y = getTerrainHeight(aPos.x, aPos.z);
+            const aGroup = new THREE.Group();
+            aGroup.position.copy(aPos);
+            for (let s = 0; s < 4; s++) {
+                const step = new THREE.Mesh(new THREE.BoxGeometry(12 - s * 2.4, 1.8, 12 - s * 2.4), sharedMats.stone);
+                step.position.y = s * 1.8 + 0.9;
+                aGroup.add(step);
+            }
+            scene.add(aGroup);
+        }
+        buildTribeCapitals();
+
+        //        // ============================================================================
+        // 7. HIGH-DETAIL BIPEDAL B&W2 CREATURE TITAN (sample1.jpg & sample5.jpg)
+        // ============================================================================
+        function buildDetailedCreatureFromSlot(slotIndex = state.activeSlotIndex) {
+            state.activeSlotIndex = slotIndex;
+            const cfg = state.creatureSlots[slotIndex] || state.creatureSlots[0];
+
+            const prevPos = state.creature.mesh ? state.creature.mesh.position.clone() : new THREE.Vector3(14, getTerrainHeight(14, 10), 10);
+            if (state.creature.mesh) scene.remove(state.creature.mesh);
+
+            const root = new THREE.Group();
+            const furTex = AssetForge.createFurTexture(cfg.color1, cfg.color2, cfg.species === 'tiger');
+            const maneTex = AssetForge.createFurTexture(cfg.color2, cfg.color1, false);
+
+            const furMat = new THREE.MeshStandardMaterial({ map: furTex, roughness: 0.68 });
+            const secMat = new THREE.MeshStandardMaterial({ map: maneTex, roughness: 0.76 });
+            const bellyMat = new THREE.MeshStandardMaterial({ color: 0xdccbb8, roughness: 0.72 });
+            const clawMat = new THREE.MeshStandardMaterial({ color: 0x141416, roughness: 0.35, metalness: 0.2 });
+            const eyeMat = new THREE.MeshBasicMaterial({ color: cfg.eyeColor });
+            const armorMat = cfg.armor === 'gold'
+                ? sharedMats.goldTrim
+                : new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.75, roughness: 0.25 });
+
+            const mScale = parseFloat(cfg.muscle) || 1.1;
+            const totalScale = parseFloat(cfg.scale) || 1.1;
+
+            const pelvisGroup = new THREE.Group();
+            pelvisGroup.position.set(0, 3.1, 0);
+            root.add(pelvisGroup);
+
+            const hipsMesh = new THREE.Mesh(new THREE.SphereGeometry(1.18 * mScale, 18, 16), furMat);
+            hipsMesh.scale.set(1.05, 0.85, 0.95);
+            hipsMesh.castShadow = true;
+            pelvisGroup.add(hipsMesh);
+
+            const spineGroup = new THREE.Group();
+            spineGroup.position.set(0, 0.55, 0);
+            pelvisGroup.add(spineGroup);
+
+            const abdomen = new THREE.Mesh(new THREE.CylinderGeometry(1.22 * mScale, 1.02 * mScale, 1.85, 18), furMat);
+            abdomen.position.set(0, 0.9, 0.05);
+            abdomen.castShadow = true;
+            spineGroup.add(abdomen);
+
+            const bellyPatch = new THREE.Mesh(new THREE.SphereGeometry(1.02 * mScale, 16, 14), bellyMat);
+            bellyPatch.scale.set(0.78, 1.35, 0.48);
+            bellyPatch.position.set(0, 1.45, 0.76 * mScale);
+            spineGroup.add(bellyPatch);
+
+            const chest = new THREE.Mesh(new THREE.SphereGeometry(1.56 * mScale, 20, 18), furMat);
+            chest.scale.set(1.14, 1.08, 0.95);
+            chest.position.set(0, 2.35, 0.18);
+            chest.castShadow = true;
+            spineGroup.add(chest);
+
+            if (cfg.species === 'lion') {
+                for (let m = 0; m < 3; m++) {
+                    const maneRing = new THREE.Mesh(new THREE.DodecahedronGeometry((1.75 - m * 0.14) * mScale, 2), secMat);
+                    maneRing.scale.set(1.08, 1.15, 1.05);
+                    maneRing.position.set(0, 3.05 + m * 0.45, -0.05 + m * 0.12);
+                    maneRing.castShadow = true;
+                    spineGroup.add(maneRing);
+                }
+            } else if (cfg.species === 'ape') {
+                const humps = new THREE.Mesh(new THREE.SphereGeometry(1.48 * mScale, 16, 14), secMat);
+                humps.scale.set(1.25, 0.85, 1.0);
+                humps.position.set(0, 3.0, -0.15);
+                spineGroup.add(humps);
+            }
+
+            const headGroup = new THREE.Group();
+            headGroup.position.set(0, 3.85, 0.55);
+            spineGroup.add(headGroup);
+
+            const cranium = new THREE.Mesh(new THREE.SphereGeometry(1.02, 18, 18), furMat);
+            cranium.scale.set(1.0, 1.05, 1.08);
+            cranium.castShadow = true;
+            headGroup.add(cranium);
+
+            const brow = new THREE.Mesh(new THREE.BoxGeometry(1.22, 0.28, 0.65), furMat);
+            brow.position.set(0, 0.36, 0.72);
+            brow.rotation.x = 0.15;
+            headGroup.add(brow);
+
+            const snoutLen = cfg.species === 'ape' ? 0.65 : 1.05;
+            const snout = new THREE.Mesh(new THREE.SphereGeometry(0.62, 16, 14), furMat);
+            snout.scale.set(0.95, 0.72, snoutLen * 1.3);
+            snout.position.set(0, -0.12, 0.75);
+            headGroup.add(snout);
+
+            const nose = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 12), clawMat);
+            nose.scale.set(1.2, 0.85, 0.85);
+            nose.position.set(0, 0.04, 0.75 + snoutLen * 0.72);
+            headGroup.add(nose);
+
+            const jawPivot = new THREE.Group();
+            jawPivot.position.set(0, -0.36, 0.35);
+            const lowerJaw = new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.28, snoutLen * 1.15), secMat);
+            lowerJaw.position.set(0, -0.05, snoutLen * 0.45);
+            const fangL = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.28, 6), sharedMats.marble);
+            fangL.position.set(-0.26, 0.16, snoutLen * 0.82);
+            const fangR = fangL.clone();
+            fangR.position.x = 0.26;
+            jawPivot.add(lowerJaw, fangL, fangR);
+            headGroup.add(jawPivot);
+
+            const earL = new THREE.Mesh(new THREE.SphereGeometry(0.28, 10, 10), secMat);
+            earL.scale.set(0.6, 1.2, 0.4);
+            earL.position.set(-0.78, 0.72, -0.05);
+            const earR = earL.clone();
+            earR.position.x = 0.78;
+            headGroup.add(earL, earR);
+
+            const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 12), eyeMat);
+            eyeL.position.set(-0.36, 0.18, 0.88);
+            const pupilL = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 8), clawMat);
+            pupilL.position.set(-0.36, 0.18, 1.0);
+            const eyeR = eyeL.clone(); eyeR.position.x = 0.36;
+            const pupilR = pupilL.clone(); pupilR.position.x = 0.36;
+            headGroup.add(eyeL, pupilL, eyeR, pupilR);
+
+            if (cfg.horns === 'curved' || cfg.species === 'cow') {
+                const hornGeo = new THREE.ConeGeometry(0.24, 1.55, 10);
+                const hornL = new THREE.Mesh(hornGeo, sharedMats.marble);
+                hornL.position.set(-0.92, 0.68, 0.05);
+                hornL.rotation.z = 0.92;
+                const hornR = hornL.clone();
+                hornR.position.x = 0.92;
+                hornR.rotation.z = -0.92;
+                headGroup.add(hornL, hornR);
+            } else if (cfg.horns === 'crown') {
+                for (let k = 0; k < 5; k++) {
+                    const spike = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.8, 6), sharedMats.goldTrim);
+                    const a = (k - 2) * 0.45;
+                    spike.position.set(Math.sin(a) * 0.75, 0.95, Math.cos(a) * 0.35);
+                    headGroup.add(spike);
+                }
+            }
+
+            function createTitanArm(isLeft) {
+                const dir = isLeft ? -1 : 1;
+                const shoulderPivot = new THREE.Group();
+                shoulderPivot.position.set(dir * 1.72 * mScale, 2.75, 0.15);
+
+                const deltoid = new THREE.Mesh(new THREE.SphereGeometry(0.58 * mScale, 14, 14), furMat);
+                shoulderPivot.add(deltoid);
+
+                const upperArm = new THREE.Mesh(new THREE.CylinderGeometry(0.48 * mScale, 0.40 * mScale, 1.65, 14), furMat);
+                upperArm.position.y = -0.82;
+                upperArm.castShadow = true;
+                shoulderPivot.add(upperArm);
+
+                const elbowPivot = new THREE.Group();
+                elbowPivot.position.set(0, -1.65, 0);
+                shoulderPivot.add(elbowPivot);
+
+                const elbowSphere = new THREE.Mesh(new THREE.SphereGeometry(0.40 * mScale, 12, 12), furMat);
+                elbowPivot.add(elbowSphere);
+
+                const forearm = new THREE.Mesh(new THREE.CylinderGeometry(0.42 * mScale, 0.36 * mScale, 1.55, 14), furMat);
+                forearm.position.set(0, -0.78, 0.12);
+                forearm.rotation.x = -0.15;
+                forearm.castShadow = true;
+                elbowPivot.add(forearm);
+
+                const pawHand = new THREE.Mesh(new THREE.SphereGeometry(0.46 * mScale, 12, 12), bellyMat);
+                pawHand.scale.set(0.95, 0.75, 1.15);
+                pawHand.position.set(0, -1.55, 0.25);
+                elbowPivot.add(pawHand);
+
+                for (let c = 0; c < 4; c++) {
+                    const claw = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.42, 6), clawMat);
+                    claw.rotation.x = Math.PI * 0.72;
+                    claw.position.set((c - 1.5) * 0.18, -1.78, 0.58);
+                    elbowPivot.add(claw);
+                }
+
+                if (cfg.armor !== 'none') {
+                    const pauldron = new THREE.Mesh(new THREE.SphereGeometry(0.74 * mScale, 14, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), armorMat);
+                    pauldron.position.y = 0.18;
+                    shoulderPivot.add(pauldron);
+                }
+
+                spineGroup.add(shoulderPivot);
+                return { shoulderPivot, elbowPivot };
+            }
+
+            const leftArm = createTitanArm(true);
+            const rightArm = createTitanArm(false);
+
+            if (cfg.armor !== 'none') {
+                const chestPlate = new THREE.Mesh(new THREE.BoxGeometry(2.2 * mScale, 1.45, 0.5), armorMat);
+                chestPlate.position.set(0, 2.35, 1.18 * mScale);
+                spineGroup.add(chestPlate);
+            }
+
+            function createTitanLeg(isLeft) {
+                const dir = isLeft ? -1 : 1;
+                const hipPivot = new THREE.Group();
+                hipPivot.position.set(dir * 0.88 * mScale, 0, 0);
+
+                const thigh = new THREE.Mesh(new THREE.CylinderGeometry(0.62 * mScale, 0.46 * mScale, 1.65, 14), furMat);
+                thigh.position.set(0, -0.78, 0.18);
+                thigh.rotation.x = -0.22;
+                thigh.castShadow = true;
+                hipPivot.add(thigh);
+
+                const kneePivot = new THREE.Group();
+                kneePivot.position.set(0, -1.55, 0.35);
+                hipPivot.add(kneePivot);
+
+                const kneeJoint = new THREE.Mesh(new THREE.SphereGeometry(0.45 * mScale, 12, 12), furMat);
+                kneePivot.add(kneeJoint);
+
+                const calf = new THREE.Mesh(new THREE.CylinderGeometry(0.44 * mScale, 0.36 * mScale, 1.45, 14), furMat);
+                calf.position.set(0, -0.68, -0.18);
+                calf.rotation.x = 0.25;
+                calf.castShadow = true;
+                kneePivot.add(calf);
+
+                const footGroup = new THREE.Group();
+                footGroup.position.set(0, -1.42, 0.15);
+                const footBase = new THREE.Mesh(new THREE.SphereGeometry(0.58 * mScale, 14, 12), furMat);
+                footBase.scale.set(0.95, 0.48, 1.45);
+                footBase.castShadow = true;
+                footGroup.add(footBase);
+
+                for (let t = 0; t < 4; t++) {
+                    const tx = (t - 1.5) * 0.24 * mScale;
+                    const toe = new THREE.Mesh(new THREE.SphereGeometry(0.18, 10, 10), bellyMat);
+                    toe.position.set(tx, -0.05, 0.68 * mScale);
+                    const claw = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.38, 6), clawMat);
+                    claw.rotation.x = Math.PI / 2.1;
+                    claw.position.set(tx, -0.08, 0.96 * mScale);
+                    footGroup.add(toe, claw);
+                }
+                kneePivot.add(footGroup);
+                pelvisGroup.add(hipPivot);
+                return { hipPivot, kneePivot };
+            }
+
+            const leftLeg = createTitanLeg(true);
+            const rightLeg = createTitanLeg(false);
+
+            const tailPivot = new THREE.Group();
+            tailPivot.position.set(0, -0.1, -0.85);
+            const tailSeg1 = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.22, 1.6, 10), furMat);
+            tailSeg1.rotation.x = -1.1;
+            tailSeg1.position.set(0, -0.35, -0.7);
+            const tailSeg2 = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 1.5, 10), furMat);
+            tailSeg2.rotation.x = -0.45;
+            tailSeg2.position.set(0, -0.55, -1.85);
+            const tailTuft = new THREE.Mesh(new THREE.DodecahedronGeometry(0.38, 1), secMat);
+            tailTuft.position.set(0, -0.25, -2.55);
+            tailPivot.add(tailSeg1, tailSeg2, tailTuft);
+            pelvisGroup.add(tailPivot);
+
+            root.scale.setScalar(totalScale);
+            root.position.copy(prevPos);
+            root.position.y = getTerrainHeight(root.position.x, root.position.z);
+            scene.add(root);
+
+            state.creature.mesh = root;
+            state.creature.joints = {
+                pelvisGroup,
+                spineGroup,
+                headGroup,
+                jawPivot,
+                leftArm,
+                rightArm,
+                leftLeg,
+                rightLeg,
+                tailPivot
+            };
+            renderCreatureSlotBars();
+            updateHUD();
+        }
+
+        //        function initStartingCivilization() {
+            createDetailedBuilding('house', -4, 14, true);
+            createDetailedBuilding('house', 8, 15, true);
+            createDetailedBuilding('mill', 22, 12, true);
+            createDetailedBuilding('warehouse', -18, 14, true);
+
+            const startRoles = ['Bauer', 'Bauer', 'Holzfäller', 'Baumeister', 'Baumeister', 'Priester', 'Bergarbeiter'];
+            startRoles.forEach((r, idx) => {
+                const a = (idx / startRoles.length) * Math.PI * 2;
+                spawnVillager(Math.cos(a) * 10, Math.sin(a) * 10, r);
+            });
+            buildDetailedCreatureFromSlot(state.activeSlotIndex);
+        }
+
+        function addFaith(amount) {
+            state.faith += amount;
+            const nextEpoch = EPOCHS[state.epochIndex + 1];
+            if (nextEpoch && state.faith >= nextEpoch.faithReq) {
+                state.epochIndex++;
+                SoundFX.playChime();
+                rebuildTempleMesh();
+                updateInfluenceRing();
+                showToast(`🏛️ Epochen-Aufstieg: ${EPOCHS[state.epochIndex].name} erreicht!`);
+            }
+            updateHUD();
+        }
+
+        function shiftAlignment(delta) {
+            state.alignment = Math.max(-100, Math.min(100, state.alignment + delta));
+            updateInfluenceRing();
+            updateHUD();
+        }
+
+        function updateHUD() {
+            const ep = EPOCHS[state.epochIndex];
+            const nextEp = EPOCHS[state.epochIndex + 1];
+            const romanEl = document.getElementById('hud-epoch-roman');
+            if (romanEl) romanEl.textContent = ep.roman;
+            const epNameEl = document.getElementById('hud-epoch-name');
+            if (epNameEl) epNameEl.textContent = ep.name;
+
+            const faithMax = nextEp ? nextEp.faithReq : 500;
+            const fValEl = document.getElementById('hud-faith-val');
+            const fMaxEl = document.getElementById('hud-faith-max');
+            const fBarEl = document.getElementById('hud-faith-bar');
+            if (fValEl) fValEl.textContent = Math.floor(state.faith);
+            if (fMaxEl) fMaxEl.textContent = faithMax;
+            if (fBarEl) fBarEl.style.width = `${Math.min(100, (state.faith / faithMax) * 100)}%`;
+
+            const alignEl = document.getElementById('hud-align-label');
+            if (alignEl) {
+                const a = Math.round(state.alignment);
+                alignEl.textContent = a > 20 ? `Gütig (+${a})` : (a < -20 ? `Zornig (${a})` : `Neutral (${a})`);
+                alignEl.className = a > 20 ? 'text-sky-300' : (a < -20 ? 'text-rose-400' : 'text-slate-200');
+            }
+
+            const rf = document.getElementById('res-food');
+            const rw = document.getElementById('res-wood');
+            const ro = document.getElementById('res-ore');
+            const rm = document.getElementById('res-mana');
+            const rp = document.getElementById('res-pop');
+            if (rf) rf.textContent = Math.floor(state.resources.food);
+            if (rw) rw.textContent = Math.floor(state.resources.wood);
+            if (ro) ro.textContent = Math.floor(state.resources.ore);
+            if (rm) rm.textContent = Math.floor(state.resources.mana);
+            if (rp) rp.textContent = `${villagers.length}/${state.resources.maxPop}`;
+
+            const activeSlot = state.creatureSlots[state.activeSlotIndex] || state.creatureSlots[0];
+            const meta = SPECIES_META[activeSlot.species] || SPECIES_META.lion;
+            const cNameEl = document.getElementById('hud-creature-name');
+            const cStateEl = document.getElementById('hud-creature-state');
+            if (cNameEl) cNameEl.textContent = `${meta.icon} ${activeSlot.name}`;
+            if (cStateEl) cStateEl.textContent = state.creature.stateText;
+
+            const tv = document.getElementById('tribe-vikings-val');
+            const tj = document.getElementById('tribe-japanese-val');
+            const ta = document.getElementById('tribe-aztecs-val');
+            if (tv) tv.textContent = `${Math.min(100, Math.floor(state.tribes.vikings.impress))}%`;
+            if (tj) tj.textContent = `${Math.min(100, Math.floor(state.tribes.japanese.impress))}%`;
+            if (ta) ta.textContent = `${Math.min(100, Math.floor(state.tribes.aztecs.impress))}%`;
+        }
+
+        function renderCreatureSlotBars() {
+            const titleBar = document.getElementById('title-slot-buttons');
+            const hudBar = document.getElementById('hud-slot-switcher');
+            const designerTabs = document.getElementById('designer-slot-tabs');
+
+            const makeBtn = (s, idx, compact = false) => {
+                const meta = SPECIES_META[s.species] || SPECIES_META.lion;
+                const active = idx === state.activeSlotIndex;
+                return `<button onclick="window.selectCreatureSlot(${idx})" class="${compact ? 'py-1 px-1.5 text-[10px]' : 'px-2.5 py-1 text-xs'} rounded-xl font-bold transition border ${active ? 'bg-amber-500 text-slate-950 border-amber-300 shadow' : 'bg-slate-900/90 text-slate-300 border-slate-700 hover:bg-slate-800'}">
+                    ${meta.icon} ${compact ? (idx + 1) : s.name.split(' ')[0]}
+                </button>`;
+            };
+
+            if (titleBar) titleBar.innerHTML = state.creatureSlots.map((s, i) => makeBtn(s, i, false)).join('');
+            if (hudBar) hudBar.innerHTML = state.creatureSlots.map((s, i) => makeBtn(s, i, true)).join('');
+            if (designerTabs) {
+                designerTabs.innerHTML = state.creatureSlots.map((s, i) => {
+                    const meta = SPECIES_META[s.species] || SPECIES_META.lion;
+                    const active = i === state.activeSlotIndex;
+                    return `<button onclick="window.selectCreatureSlot(${i}); window.populateDesignerFields();" class="py-2 px-2 rounded-xl text-xs font-bold border ${active ? 'bg-amber-500 text-slate-950 border-amber-300' : 'bg-slate-900 text-slate-300 border-slate-700'}">
+                        Slot ${i + 1}: ${meta.icon}
+                    </button>`;
+                }).join('');
+            }
+        }
+
+        //        window.selectCreatureSlot = function(idx) {
+            state.activeSlotIndex = idx;
+            buildDetailedCreatureFromSlot(idx);
+            SoundFX.playTone(520, 0.12, 'sine', 0.05);
+        };
+
+        window.populateDesignerFields = function() {
+            const s = state.creatureSlots[state.activeSlotIndex];
+            if (!s) return;
+            document.getElementById('cd-name').value = s.name;
+            document.getElementById('cd-species').value = s.species;
+            document.getElementById('cd-scale').value = s.scale;
+            document.getElementById('cd-scale-val').textContent = s.scale;
+            document.getElementById('cd-muscle').value = s.muscle;
+            document.getElementById('cd-muscle-val').textContent = s.muscle;
+            document.getElementById('cd-horns').value = s.horns;
+            document.getElementById('cd-armor').value = s.armor;
+            document.getElementById('cd-color1').value = s.color1;
+            document.getElementById('cd-color2').value = s.color2;
+            document.getElementById('cd-eye').value = s.eyeColor;
+            renderCreatureSlotBars();
+        };
+
+        window.openCreatureDesigner = function() {
+            window.populateDesignerFields();
+            const m = document.getElementById('creature-designer-modal');
+            if (m) { m.classList.remove('hidden'); m.classList.add('flex'); }
+        };
+
+        window.closeCreatureDesigner = function() {
+            const m = document.getElementById('creature-designer-modal');
+            if (m) { m.classList.add('hidden'); m.classList.remove('flex'); }
+        };
+
+        window.saveCurrentCreatureSlot = function() {
+            const s = state.creatureSlots[state.activeSlotIndex];
+            s.name = document.getElementById('cd-name').value.trim() || `Titan #${state.activeSlotIndex + 1}`;
+            s.species = document.getElementById('cd-species').value;
+            s.scale = parseFloat(document.getElementById('cd-scale').value) || 1.1;
+            s.muscle = parseFloat(document.getElementById('cd-muscle').value) || 1.1;
+            s.horns = document.getElementById('cd-horns').value;
+            s.armor = document.getElementById('cd-armor').value;
+            s.color1 = document.getElementById('cd-color1').value;
+            s.color2 = document.getElementById('cd-color2').value;
+            s.eyeColor = document.getElementById('cd-eye').value;
+
+            try {
+                localStorage.setItem('godless_creature_slots_v2', JSON.stringify(state.creatureSlots));
+            } catch (e) {}
+
+            buildDetailedCreatureFromSlot(state.activeSlotIndex);
+            window.closeCreatureDesigner();
+            showToast(`🧬 Slot ${state.activeSlotIndex + 1} (${s.name}) gespeichert & 3D-Titan aktualisiert!`);
+        };
+
+        window.resetCreatureSlotsDefault = function() {
+            state.creatureSlots = JSON.parse(JSON.stringify(DEFAULT_CREATURE_SLOTS));
+            window.populateDesignerFields();
+            buildDetailedCreatureFromSlot(state.activeSlotIndex);
+        };
+
+        window.openDiscordModal = function() {
+            const m = document.getElementById('discord-modal');
+            if (m) { m.classList.remove('hidden'); m.classList.add('flex'); }
+        };
+        window.closeDiscordModal = function() {
+            const m = document.getElementById('discord-modal');
+            if (m) { m.classList.add('hidden'); m.classList.remove('flex'); }
+        };
+        window.copyRoomCode = function() {
+            const code = document.getElementById('discord-room-code').textContent;
+            const temp = document.createElement('textarea');
+            temp.value = code;
+            document.body.appendChild(temp);
+            temp.select();
+            document.execCommand('copy');
+            document.body.removeChild(temp);
+            document.getElementById('discord-status-msg').textContent = `✅ Raumcode ${code} in die Zwischenablage kopiert!`;
+        };
+        window.sendDiscordWebhookPing = function() {
+            const url = document.getElementById('discord-webhook-input').value.trim();
+            const msgEl = document.getElementById('discord-status-msg');
+            if (!url) {
+                msgEl.textContent = '🔔 Lokaler Pantheon-Ping simuliert: Bereit für Koop-Session!';
+                return;
+            }
+            fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: `⚡ **GOD:less Pantheon-Ruf!** Raum **OLYMP-7742** ist aktiv (Epoche ${EPOCHS[state.epochIndex].roman}).` })
+            }).then(() => {
+                msgEl.textContent = '✅ Live-Ping erfolgreich an deinen Discord-Channel gesendet!';
+            }).catch(() => {
+                msgEl.textContent = '🔔 Pantheon-Status lokal synchronisiert.';
+            });
+        };
+
+        window.openSettingsModal = function() {
+            const m = document.getElementById('settings-modal');
+            if (m) { m.classList.remove('hidden'); m.classList.add('flex'); }
+        };
+        window.closeSettingsModal = function() {
+            const m = document.getElementById('settings-modal');
+            if (m) { m.classList.add('hidden'); m.classList.remove('flex'); }
+        };
+        window.setLightningIntensity = function(val) {
+            state.lightningIntensity = parseFloat(val) || 1.0;
+        };
+        window.setRenderQuality = function(val) {
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, parseFloat(val) || 1.5));
+        };
+
+        const TUTORIAL_STEPS = [
+            '1/5 • Bewege die Kamera mit WASD oder den Pfeiltasten und zoome mit dem Mausrad über deine klassische Polis.',
+            '2/5 • Bewege die schwebende Wolkenhand über einen Siedler oder Baum und halte LINKSKLICK, um ihn hochzuheben.',
+            '3/5 • Wähle unten links ein Bauwerk (z.B. Klassische Villa) und platziere die Baustelle innerhalb des leuchtenden Einflussbandes.',
+            '4/5 • Halte RECHTSKLICK gedrückt und zeichne eine Spirale (Regen), einen Kreis (Feuerball) oder ein Zick-Zack (Blitz).',
+            '5/5 • Wechsle links die Rolle deines Kreaturen-Titanen (z.B. Baumeister) oder lobe/strafe ihn!'
+        ];
+
+        window.nextTutorialStep = function() {
+            state.tutorial.step = (state.tutorial.step + 1) % TUTORIAL_STEPS.length;
+            const tEl = document.getElementById('tutorial-text');
+            if (tEl) tEl.textContent = TUTORIAL_STEPS[state.tutorial.step];
+        };
+
+        window.startGameMode = function(mode) {
+            state.mode = mode;
+            state.inTitleScreen = false;
+            document.getElementById('title-screen').classList.add('hidden');
+            document.getElementById('lightning-fx-canvas').classList.add('hidden');
+            const hud = document.getElementById('game-hud');
+            hud.classList.remove('hidden');
+            hud.classList.add('flex');
+
+            const tutBanner = document.getElementById('tutorial-banner');
+            if (mode === 'tutorial') {
+                state.tutorial.active = true;
+                state.tutorial.step = 0;
+                tutBanner.classList.remove('hidden');
+                document.getElementById('tutorial-text').textContent = TUTORIAL_STEPS[0];
+            } else {
+                state.tutorial.active = false;
+                tutBanner.classList.add('hidden');
+            }
+            SoundFX.playChime();
+            showToast(`⚡ Willkommen in GOD:less (${mode.toUpperCase()})`);
+        };
+
+        window.returnToTitleScreen = function() {
+            state.inTitleScreen = true;
+            document.getElementById('title-screen').classList.remove('hidden');
+            document.getElementById('lightning-fx-canvas').classList.remove('hidden');
+            const hud = document.getElementById('game-hud');
+            hud.classList.add('hidden');
+            hud.classList.remove('flex');
+        };
+
+        window.saveWorldState = function() {
+            try {
+                const payload = {
+                    epochIndex: state.epochIndex,
+                    faith: state.faith,
+                    alignment: state.alignment,
+                    resources: state.resources,
+                    time: state.time,
+                    activeSlotIndex: state.activeSlotIndex,
+                    tribes: {
+                        vikings: state.tribes.vikings.impress,
+                        japanese: state.tribes.japanese.impress,
+                        aztecs: state.tribes.aztecs.impress
+                    },
+                    buildings: buildings.map(b => ({ type: b.type, x: b.x, z: b.z, buildProgress: b.buildProgress, hp: b.hp }))
+                };
+                localStorage.setItem('godless_saved_world_v2', JSON.stringify(payload));
+                const btn = document.getElementById('btn-continue-saved');
+                if (btn) { btn.classList.remove('hidden'); btn.classList.add('inline-flex'); }
+                showToast('💾 Weltzustand & Kreaturen-Fortschritt erfolgreich gespeichert!');
+            } catch (e) {}
+        };
+
+        window.loadSavedWorld = function() {
+            try {
+                const raw = localStorage.getItem('godless_saved_world_v2');
+                if (!raw) return;
+                const data = JSON.parse(raw);
+                state.epochIndex = data.epochIndex || 0;
+                state.faith = data.faith || 15;
+                state.alignment = data.alignment || 0;
+                if (data.resources) state.resources = data.resources;
+                if (data.time) state.time = data.time;
+                if (typeof data.activeSlotIndex === 'number') state.activeSlotIndex = data.activeSlotIndex;
+                if (data.tribes) {
+                    state.tribes.vikings.impress = data.tribes.vikings || 35;
+                    state.tribes.japanese.impress = data.tribes.japanese || 20;
+                    state.tribes.aztecs.impress = data.tribes.aztecs || 5;
+                }
+                while (buildings.length > 0) {
+                    const old = buildings.pop();
+                    scene.remove(old.mesh);
+                }
+                if (Array.isArray(data.buildings)) {
+                    data.buildings.forEach(b => {
+                        const created = createDetailedBuilding(b.type, b.x, b.z, b.buildProgress >= 100);
+                        created.buildProgress = b.buildProgress;
+                        created.hp = b.hp;
+                        updateBuildingVisualState(created);
+                    });
+                }
+                rebuildTempleMesh();
+                updateInfluenceRing();
+                buildDetailedCreatureFromSlot(state.activeSlotIndex);
+                window.startGameMode('singleplayer');
+                showToast('📂 Gespeicherte Welt wiederhergestellt!');
+            } catch (e) {}
+        };
+
+        window.setTimeScale = function(scale) {
+            state.time.scale = scale;
+            [0, 1, 2, 4].forEach(s => {
+                const btn = document.getElementById(`speed-${s}`);
+                if (btn) {
+                    btn.className = s === scale
+                        ? 'px-2 py-1 rounded text-[10px] font-bold bg-amber-500 text-slate-950'
+                        : 'px-2 py-1 rounded text-[10px] font-bold bg-slate-800 text-slate-300 hover:bg-slate-700';
+                }
+            });
+        };
+
+        window.setCreatureRole = function(role) {
+            state.creature.role = role;
+            ['free', 'gather', 'builder', 'entertain', 'soldier'].forEach(r => {
+                const btn = document.getElementById(`crole-${r}`);
+                if (btn) {
+                    btn.className = r === role
+                        ? 'px-1.5 py-1 rounded bg-amber-500 text-slate-950 font-bold text-[10px]'
+                        : 'px-1.5 py-1 rounded bg-slate-800 text-slate-300 font-semibold text-[10px]';
+                }
+            });
+            creatureDecisionTimer = 0;
+            showToast(`🐾 Titanen-Modus geändert: ${role.toUpperCase()}`);
+        };
+
+        window.praiseCreature = function() {
+            shiftAlignment(4);
+            addFaith(4);
+            state.creature.animMode = 'think';
+            if (state.creature.mesh) spawnMiracleParticles(state.creature.mesh.position, 0x34d399, 18);
+            SoundFX.playChime();
+            showToast('🙌 Du streichelst deinen Titanen (+Gütige Gesinnung, +Glaube)');
+        };
+
+        window.punishCreature = function() {
+            shiftAlignment(-6);
+            state.creature.animMode = 'roar';
+            if (state.creature.mesh) spawnMiracleParticles(state.creature.mesh.position, 0xef4444, 18);
+            SoundFX.playThunder();
+            showToast('⚡ Du züchtigst deinen Titanen (+Zornige Gesinnung, wildes Brüllen)');
+        };
+
+        window.selectBuildMode = function(type) {
+            state.buildMode = state.buildMode === type ? null : type;
+            ['house', 'mill', 'warehouse', 'barracks', 'shrine'].forEach(t => {
+                const btn = document.getElementById(`build-${t}`);
+                if (btn) {
+                    btn.className = t === state.buildMode
+                        ? 'px-3 py-2 rounded-xl bg-amber-500/30 border border-amber-400 text-xs flex items-center gap-2'
+                        : 'px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-xs flex items-center gap-2';
+                }
+            });
+            if (state.buildMode) {
+                showToast(`🏗️ Baumodus aktiv: Klicke in deinen Einflussbereich, um [${type.toUpperCase()}] zu errichten`);
+            }
+        };
+
+        //        // ============================================================================
+        // 8. MIRACLES, 3D HAND INTERACTION & GESTURE RUNE RECOGNITION
+        // ============================================================================
+        function spawnMiracleParticles(pos, colorHex, count = 22) {
+            for (let i = 0; i < count; i++) {
+                const orb = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.22 + Math.random() * 0.18, 8, 8),
+                    new THREE.MeshBasicMaterial({ color: colorHex })
+                );
+                orb.position.set(
+                    pos.x + (Math.random() - 0.5) * 3.5,
+                    pos.y + 0.5 + Math.random() * 2.5,
+                    pos.z + (Math.random() - 0.5) * 3.5
+                );
+                orb.userData = {
+                    vx: (Math.random() - 0.5) * 4,
+                    vy: 2.5 + Math.random() * 4.5,
+                    vz: (Math.random() - 0.5) * 4,
+                    life: 1.0 + Math.random() * 0.7
+                };
+                scene.add(orb);
+                particles.push(orb);
+            }
+        }
+
+        function executeMiracle(type, targetVec) {
+            const costs = { water: 25, heal: 35, fireball: 45, lightning: 55, volcano: 110 };
+            const cost = costs[type] || 30;
+            if (state.resources.mana < cost) {
+                showToast('✨ Nicht genügend göttliches Mana für dieses Wunder!');
+                return;
+            }
+            state.resources.mana -= cost;
+
+            if (type === 'water') {
+                spawnMiracleParticles(targetVec, 0x38bdf8, 36);
+                state.resources.food += 35;
+                addFaith(8);
+                shiftAlignment(3);
+                SoundFX.playChime();
+                showToast('🌧️ Segensregen lässt die Felder sprießen (+35 Nahrung, +Glaube)');
+            } else if (type === 'heal') {
+                spawnMiracleParticles(targetVec, 0x34d399, 36);
+                buildings.forEach(b => {
+                    if (Math.hypot(b.x - targetVec.x, b.z - targetVec.z) < 22) {
+                        b.hp = b.maxHp;
+                        b.buildProgress = 100;
+                        updateBuildingVisualState(b);
+                    }
+                });
+                addFaith(12);
+                shiftAlignment(6);
+                SoundFX.playChime();
+                showToast('💚 Göttliche Heilung repariert und segnet alle Bauwerke im Umkreis!');
+            } else if (type === 'fireball') {
+                spawnMiracleParticles(targetVec, 0xf97316, 42);
+                buildings.forEach(b => {
+                    if (Math.hypot(b.x - targetVec.x, b.z - targetVec.z) < 14) {
+                        b.hp = Math.max(0, b.hp - 48);
+                        updateBuildingVisualState(b);
+                    }
+                });
+                state.tribes.vikings.impress = Math.min(100, state.tribes.vikings.impress + 8);
+                shiftAlignment(-8);
+                SoundFX.playThunder();
+                showToast('🔥 Feuerball schlägt ein! Gebäude brennen mehrstufig nieder!');
+            } else if (type === 'lightning') {
+                spawnMiracleParticles(targetVec, 0xfacc15, 45);
+                buildings.forEach(b => {
+                    if (Math.hypot(b.x - targetVec.x, b.z - targetVec.z) < 12) {
+                        b.hp = Math.max(0, b.hp - 65);
+                        updateBuildingVisualState(b);
+                    }
+                });
+                state.tribes.japanese.impress = Math.min(100, state.tribes.japanese.impress + 10);
+                shiftAlignment(-10);
+                SoundFX.playThunder();
+                showToast('⚡ Göttlicher Blitzschlag zerschmettert Dächer in Funken & Rauch!');
+            } else if (type === 'volcano') {
+                spawnMiracleParticles(targetVec, 0xef4444, 70);
+                spawnDestructionDebris(targetVec.x, targetVec.y, targetVec.z, 32);
+                buildings.forEach(b => {
+                    if (Math.hypot(b.x - targetVec.x, b.z - targetVec.z) < 24) {
+                        b.hp = 0;
+                        updateBuildingVisualState(b);
+                    }
+                });
+                state.tribes.aztecs.impress = Math.min(100, state.tribes.aztecs.impress + 22);
+                shiftAlignment(-18);
+                SoundFX.playThunder();
+                showToast('🌋 EPISCHES WUNDER: Ein Vulkanausbruch erschüttert die Insel!');
+            }
+            updateHUD();
+        }
+
+        window.castMiracleAtCursor = function(type) {
+            executeMiracle(type, handGroup.position.clone());
+        };
+
+        // Raycasting & Mouse/Gesture Controls
+        const raycaster = new THREE.Raycaster();
+        const mouseNDC = new THREE.Vector2();
+        const gestureCanvas = document.getElementById('gesture-canvas');
+        const gCtx = gestureCanvas.getContext('2d');
+        let gesturePoints = [];
+
+        function updateHandWorldPosition(clientX, clientY) {
+            mouseNDC.x = (clientX / window.innerWidth) * 2 - 1;
+            mouseNDC.y = -(clientY / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(mouseNDC, camera);
+
+            const hits = raycaster.intersectObject(terrainMesh);
+            if (hits.length > 0) {
+                const pt = hits[0].point;
+                handGroup.position.set(pt.x, pt.y, pt.z);
+            }
+
+            // Check hovered interactive entities
+            const interactiveRoots = [...villagers, ...resourcesNodes, ...buildings.map(b => b.mesh)];
+            const entityHits = raycaster.intersectObjects(interactiveRoots, true);
+            state.hoveredEntity = null;
+            const ctxLabel = document.getElementById('hud-hand-context');
+
+            if (entityHits.length > 0) {
+                let obj = entityHits[0].object;
+                while (obj.parent && !obj.userData.entityType) obj = obj.parent;
+                if (obj.userData && obj.userData.entityType) {
+                    state.hoveredEntity = obj;
+                    if (ctxLabel) {
+                        if (obj.userData.entityType === 'villager') {
+                            ctxLabel.textContent = `☁️🖐️ Siedler (${obj.userData.role}) — Linksklick halten zum Aufheben`;
+                        } else if (obj.userData.entityType === 'resource') {
+                            ctxLabel.textContent = `☁️🖐️ Rohstoff (${obj.userData.resType.toUpperCase()}) — Linksklick zum Ernten`;
+                        } else if (obj.userData.entityType === 'building') {
+                            const b = obj.userData.buildingRef;
+                            ctxLabel.textContent = `☁️🖐️ Bauwerk (${b.type.toUpperCase()} • Bau: ${Math.floor(b.buildProgress)}% • HP: ${Math.floor(b.hp)}%)`;
+                        }
+                    }
+                }
+            } else if (ctxLabel) {
+                ctxLabel.textContent = '☁️🖐️ Göttliche Wolkenhand bereit (Linksklick: Interagieren/Bauen • Rechtsklick: Wunder-Rune)';
+            }
+
+            if (state.heldObject) {
+                state.heldObject.position.set(handGroup.position.x, handGroup.position.y + 3.2, handGroup.position.z);
+            }
+        }
+
+        window.addEventListener('pointermove', (e) => {
+            if (state.inTitleScreen) return;
+            updateHandWorldPosition(e.clientX, e.clientY);
+
+            if (isDrawingGesture) {
+                gesturePoints.push({ x: e.clientX, y: e.clientY });
+                gCtx.clearRect(0, 0, gestureCanvas.width, gestureCanvas.height);
+                gCtx.save();
+                gCtx.strokeStyle = '#38bdf8';
+                gCtx.shadowColor = '#67e8f9';
+                gCtx.shadowBlur = 16;
+                gCtx.lineWidth = 4;
+                gCtx.lineCap = 'round';
+                gCtx.beginPath();
+                gesturePoints.forEach((p, idx) => {
+                    if (idx === 0) gCtx.moveTo(p.x, p.y);
+                    else gCtx.lineTo(p.x, p.y);
+                });
+                gCtx.stroke();
+                gCtx.restore();
+            }
+        });
+
+        window.addEventListener('pointerdown', (e) => {
+            if (state.inTitleScreen) return;
+            if (e.target.closest('.aoe-panel') || e.target.closest('button')) return;
+
+            if (e.button === 2) {
+                isDrawingGesture = true;
+                gesturePoints = [{ x: e.clientX, y: e.clientY }];
+                return;
+            }
+
+            if (e.button === 0) {
+                updateHandWorldPosition(e.clientX, e.clientY);
+
+                if (state.buildMode) {
+                    const dist = Math.hypot(handGroup.position.x, handGroup.position.z);
+                    if (dist > EPOCHS[state.epochIndex].influenceRadius) {
+                        showToast('⚠️ Außerhalb deines leuchtenden Einflussbandes!');
+                        return;
+                    }
+                    if (state.resources.wood < 30) {
+                        showToast('🌲 Nicht genügend Holz für dieses Bauwerk!');
+                        return;
+                    }
+                    state.resources.wood -= 30;
+                    createDetailedBuilding(state.buildMode, handGroup.position.x, handGroup.position.z, false);
+                    SoundFX.playTone(340, 0.16, 'triangle', 0.08);
+                    window.selectBuildMode(null);
+                    return;
+                }
+
+                if (state.hoveredEntity) {
+                    const ent = state.hoveredEntity;
+                    if (ent.userData.entityType === 'villager') {
+                        state.heldObject = ent;
+                        SoundFX.playTone(480, 0.12, 'sine', 0.05);
+                    } else if (ent.userData.entityType === 'resource') {
+                        if (ent.userData.resType === 'wood') state.resources.wood += 18;
+                        else state.resources.ore += 15;
+                        spawnMiracleParticles(ent.position, 0xfacc15, 10);
+                        SoundFX.playTone(300, 0.12, 'triangle', 0.06);
+                        updateHUD();
+                    } else if (ent.userData.entityType === 'building') {
+                        const b = ent.userData.buildingRef;
+                        if (b.buildProgress < 100 || b.hp < b.maxHp) {
+                            b.buildProgress = Math.min(100, b.buildProgress + 18);
+                            b.hp = Math.min(b.maxHp, b.hp + 20);
+                            updateBuildingVisualState(b);
+                            spawnMiracleParticles(b.mesh.position, 0x38bdf8, 12);
+                            addFaith(3);
+                        }
+                    }
+                }
+            }
+        });
+
+        window.addEventListener('pointerup', (e) => {
+            if (state.inTitleScreen) return;
+
+            if (e.button === 2 && isDrawingGesture) {
+                isDrawingGesture = false;
+                gCtx.clearRect(0, 0, gestureCanvas.width, gestureCanvas.height);
+                if (gesturePoints.length > 10) {
+                    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+                    let dirChanges = 0;
+                    for (let i = 1; i < gesturePoints.length; i++) {
+                        const p = gesturePoints[i];
+                        minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+                        minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+                        if (i > 2) {
+                            const dx1 = gesturePoints[i - 1].x - gesturePoints[i - 2].x;
+                            const dx2 = p.x - gesturePoints[i - 1].x;
+                            if (dx1 * dx2 < -15) dirChanges++;
+                        }
+                    }
+                    const startEndDist = Math.hypot(
+                        gesturePoints[0].x - gesturePoints[gesturePoints.length - 1].x,
+                        gesturePoints[0].y - gesturePoints[gesturePoints.length - 1].y
+                    );
+                    const boxSize = Math.max(maxX - minX, maxY - minY);
+
+                    if (dirChanges >= 3) {
+                        executeMiracle('lightning', handGroup.position.clone());
+                    } else if (startEndDist < boxSize * 0.42) {
+                        executeMiracle('fireball', handGroup.position.clone());
+                    } else if ((maxY - minY) > (maxX - minX) * 1.35) {
+                        executeMiracle('heal', handGroup.position.clone());
+                    } else {
+                        executeMiracle('water', handGroup.position.clone());
+                    }
+                }
+                gesturePoints = [];
+            }
+
+            if (e.button === 0 && state.heldObject) {
+                const v = state.heldObject;
+                v.position.y = getTerrainHeight(v.position.x, v.position.z);
+
+                // Assign role based on drop location
+                const nearTemple = Math.hypot(v.position.x + 14, v.position.z + 4) < 14;
+                const nearBuilding = buildings.find(b => Math.hypot(b.x - v.position.x, b.z - v.position.z) < 8);
+                if (nearTemple) {
+                    setVillagerRole(v, 'Priester');
+                    addFaith(5);
+                    showToast('🙏 Siedler zum Priester am Kuppeltempel geweiht (+Glaube)');
+                } else if (nearBuilding) {
+                    if (nearBuilding.buildProgress < 100) {
+                        setVillagerRole(v, 'Baumeister');
+                        showToast('🔨 Siedler als Baumeister der Baustelle zugewiesen!');
+                    } else if (nearBuilding.type === 'mill') {
+                        setVillagerRole(v, 'Bauer');
+                        showToast('🌾 Siedler als Bauer an der Windmühle zugewiesen!');
+                    }
+                }
+                state.heldObject = null;
+            }
+        });
+
+        // Camera Keyboard & Wheel Controls
+        const keysPressed = {};
+        window.addEventListener('keydown', (e) => { keysPressed[e.key.toLowerCase()] = true; });
+        window.addEventListener('keyup', (e) => { keysPressed[e.key.toLowerCase()] = false; });
+        window.addEventListener('wheel', (e) => {
+            if (state.inTitleScreen) return;
+            camSpherical.radius = Math.max(24, Math.min(155, camSpherical.radius + e.deltaY * 0.05));
+        });
+
+        //        // ============================================================================
+        // 9. BIPEDAL CREATURE AI & FULL-BODY KINEMATIC ANIMATIONS
+        // ============================================================================
+        let creatureDecisionTimer = 0;
+
+        function updateCreatureAI(dt, now) {
+            const c = state.creature;
+            if (!c.mesh) return;
+
+            creatureDecisionTimer -= dt;
+            if (creatureDecisionTimer <= 0) {
+                creatureDecisionTimer = 4.6;
+                c.hunger = Math.min(100, c.hunger + 1.0);
+
+                const needyBuilding = buildings.find(b => b.buildProgress < 100 || (b.hp < b.maxHp && b.hp > 0));
+                if ((c.role === 'builder' || c.role === 'free') && needyBuilding) {
+                    c.targetPos.set(needyBuilding.x + 3.4, 0, needyBuilding.z + 3.2);
+                    c.stateText = 'Baut & repariert Bauwerk';
+                    c.animMode = 'work';
+                    c.animTimer = 3.2;
+                    needyBuilding.buildProgress = Math.min(100, needyBuilding.buildProgress + 24);
+                    needyBuilding.hp = Math.min(needyBuilding.maxHp, needyBuilding.hp + 22);
+                    updateBuildingVisualState(needyBuilding);
+                    addFaith(5);
+                } else if (c.role === 'gather') {
+                    c.stateText = 'Sammelt Holz & Korn für dein Lager';
+                    c.animMode = 'work';
+                    state.resources.wood += 6;
+                    state.resources.food += 6;
+                } else if (c.role === 'entertain') {
+                    c.stateText = 'Begeistert deine Siedler (+Glaube)';
+                    c.animMode = 'roar';
+                    c.animTimer = 2.5;
+                    addFaith(7);
+                } else if (c.role === 'soldier') {
+                    c.stateText = 'Brüllt & bewacht die Reichsgrenzen';
+                    c.animMode = 'roar';
+                    c.animTimer = 2.5;
+                    state.tribes.vikings.impress = Math.min(100, state.tribes.vikings.impress + 2);
+                } else {
+                    c.stateText = 'Denkt nach & wacht über die Polis';
+                    c.animMode = Math.random() < 0.65 ? 'think' : 'roar';
+                    c.animTimer = 3.5;
+                    addFaith(2);
+                }
+
+                if (!needyBuilding || c.role !== 'builder') {
+                    if (Math.random() < 0.6) {
+                        const angle = Math.random() * Math.PI * 2;
+                        const dist = 12 + Math.random() * (EPOCHS[state.epochIndex].influenceRadius * 0.48);
+                        c.targetPos.set(Math.cos(angle) * dist, 0, Math.sin(angle) * dist);
+                    }
+                }
+                updateHUD();
+            }
+
+            const dx = c.targetPos.x - c.mesh.position.x;
+            const dz = c.targetPos.z - c.mesh.position.z;
+            const dist = Math.hypot(dx, dz);
+            const j = c.joints;
+            if (!j || !j.pelvisGroup) return;
+
+            if (dist > 0.85) {
+                const speed = 6.4 * dt;
+                c.mesh.position.x += (dx / dist) * speed;
+                c.mesh.position.z += (dz / dist) * speed;
+
+                const targetYaw = Math.atan2(dx, dz);
+                let diff = targetYaw - c.mesh.rotation.y;
+                while (diff > Math.PI) diff -= Math.PI * 2;
+                while (diff < -Math.PI) diff += Math.PI * 2;
+                c.mesh.rotation.y += diff * Math.min(1, dt * 7);
+
+                c.walkPhase += dt * 6.8;
+                const s = Math.sin(c.walkPhase);
+                const cWave = Math.cos(c.walkPhase);
+
+                j.pelvisGroup.position.y = 3.1 + Math.abs(s) * 0.26;
+                j.pelvisGroup.rotation.z = cWave * 0.06;
+                j.spineGroup.rotation.x = 0.14;
+                j.spineGroup.rotation.y = -s * 0.12;
+
+                j.leftLeg.hipPivot.rotation.x = s * 0.58;
+                j.leftLeg.kneePivot.rotation.x = Math.max(0, -cWave * 0.65);
+                j.rightLeg.hipPivot.rotation.x = -s * 0.58;
+                j.rightLeg.kneePivot.rotation.x = Math.max(0, cWave * 0.65);
+
+                j.leftArm.shoulderPivot.rotation.x = -s * 0.45;
+                j.leftArm.elbowPivot.rotation.x = -0.35 - Math.max(0, s * 0.35);
+                j.rightArm.shoulderPivot.rotation.x = s * 0.45;
+                j.rightArm.elbowPivot.rotation.x = -0.35 - Math.max(0, -s * 0.35);
+                j.jawPivot.rotation.x = 0.05;
+            } else {
+                j.leftLeg.hipPivot.rotation.x *= 0.85;
+                j.leftLeg.kneePivot.rotation.x *= 0.85;
+                j.rightLeg.hipPivot.rotation.x *= 0.85;
+                j.rightLeg.kneePivot.rotation.x *= 0.85;
+                j.pelvisGroup.position.y = 3.1 + Math.sin(now * 0.003) * 0.06;
+                j.pelvisGroup.rotation.z = 0;
+
+                if (c.animMode === 'think') {
+                    // Iconic B&W2 Lion Pose from sample5.jpg: Hand raised stroking chin thoughtfully
+                    j.spineGroup.rotation.x = 0.08;
+                    j.rightArm.shoulderPivot.rotation.x = -1.15;
+                    j.rightArm.shoulderPivot.rotation.z = -0.25;
+                    j.rightArm.elbowPivot.rotation.x = -1.45 + Math.sin(now * 0.005) * 0.12;
+                    j.leftArm.shoulderPivot.rotation.x = 0.15;
+                    j.leftArm.elbowPivot.rotation.x = -0.35;
+                    j.headGroup.rotation.x = 0.14 + Math.sin(now * 0.003) * 0.05;
+                    j.jawPivot.rotation.x = 0.04;
+                } else if (c.animMode === 'roar') {
+                    // Iconic B&W2 Gorilla/Titan Roar from sample1.jpg: Arms wide / chest beat + open jaw
+                    const beat = Math.sin(now * 0.014);
+                    j.spineGroup.rotation.x = -0.12;
+                    j.leftArm.shoulderPivot.rotation.x = -0.85 + beat * 0.35;
+                    j.leftArm.elbowPivot.rotation.x = -0.9;
+                    j.rightArm.shoulderPivot.rotation.x = -0.85 - beat * 0.35;
+                    j.rightArm.elbowPivot.rotation.x = -0.9;
+                    j.jawPivot.rotation.x = 0.42 + Math.abs(beat) * 0.22;
+                } else if (c.animMode === 'work') {
+                    const swing = Math.sin(now * 0.012);
+                    j.spineGroup.rotation.x = 0.22 + swing * 0.12;
+                    j.rightArm.shoulderPivot.rotation.x = -0.9 + swing * 0.65;
+                    j.rightArm.elbowPivot.rotation.x = -0.6;
+                    j.leftArm.shoulderPivot.rotation.x = -0.7 - swing * 0.45;
+                    j.leftArm.elbowPivot.rotation.x = -0.6;
+                }
+            }
+
+            if (j.tailPivot) {
+                j.tailPivot.rotation.z = Math.sin(now * 0.0042) * 0.32;
+                j.tailPivot.rotation.x = Math.cos(now * 0.0028) * 0.14;
+            }
+            if (j.headGroup) {
+                j.headGroup.rotation.y = Math.sin(now * 0.0022) * 0.22;
+            }
+
+            c.mesh.position.y = getTerrainHeight(c.mesh.position.x, c.mesh.position.z);
+        }
+
+        //        // ============================================================================
+        // 10. MAIN ANIMATION & SIMULATION LOOP
+        // ============================================================================
+        let lastFrameTime = performance.now();
+        let economyAccumulator = 0;
+
+        function animate(now) {
+            requestAnimationFrame(animate);
+
+            const rawDt = Math.min(0.05, (now - lastFrameTime) / 1000);
+            lastFrameTime = now;
+            const dt = rawDt * state.time.scale;
+
+            if (state.inTitleScreen) {
+                renderLightningOverlay();
+                camSpherical.theta += rawDt * 0.08;
+            } else {
+                const panSpeed = 38 * rawDt;
+                const forward = new THREE.Vector3(-Math.sin(camSpherical.theta), 0, -Math.cos(camSpherical.theta));
+                const right = new THREE.Vector3(Math.cos(camSpherical.theta), 0, -Math.sin(camSpherical.theta));
+
+                if (keysPressed['w'] || keysPressed['arrowup']) cameraTarget.addScaledVector(forward, panSpeed);
+                if (keysPressed['s'] || keysPressed['arrowdown']) cameraTarget.addScaledVector(forward, -panSpeed);
+                if (keysPressed['d'] || keysPressed['arrowright']) cameraTarget.addScaledVector(right, panSpeed);
+                if (keysPressed['a'] || keysPressed['arrowleft']) cameraTarget.addScaledVector(right, -panSpeed);
+                if (keysPressed['q']) camSpherical.theta -= 1.4 * rawDt;
+                if (keysPressed['e']) camSpherical.theta += 1.4 * rawDt;
+
+                cameraTarget.x = Math.max(-125, Math.min(125, cameraTarget.x));
+                cameraTarget.z = Math.max(-125, Math.min(125, cameraTarget.z));
+                cameraTarget.y = getTerrainHeight(cameraTarget.x, cameraTarget.z) + 2.5;
+            }
+
+            camera.position.set(
+                cameraTarget.x + camSpherical.radius * Math.sin(camSpherical.phi) * Math.sin(camSpherical.theta),
+                cameraTarget.y + camSpherical.radius * Math.cos(camSpherical.phi),
+                cameraTarget.z + camSpherical.radius * Math.sin(camSpherical.phi) * Math.cos(camSpherical.theta)
+            );
+            camera.lookAt(cameraTarget);
+
+            // Realistic Slow Day/Night & Season Clock (~12.5 real minutes per 24h day at 1x)
+            state.time.hour += dt * 0.032;
+            if (state.time.hour >= 24) {
+                state.time.hour -= 24;
+                state.time.day++;
+                if (state.time.day % 3 === 0) {
+                    state.time.seasonIndex = (state.time.seasonIndex + 1) % SEASONS.length;
+                    const s = SEASONS[state.time.seasonIndex];
+                    treeFoliageMaterials.forEach(m => m.color.setHex(s.foliageColor));
+                    showToast(`${s.icon} Jahreszeitenwechsel: ${s.name} hat begonnen!`);
+                }
+            }
+
+            const sunAngle = ((state.time.hour - 6) / 24) * Math.PI * 2;
+            const sunY = Math.sin(sunAngle) * 135;
+            const sunX = Math.cos(sunAngle) * 135;
+            sunLight.position.set(sunX, Math.max(14, sunY), 65);
+            sunOrb.position.set(sunX, sunY, -90);
+            moonOrb.position.set(-sunX, -sunY, -90);
+
+            const daylight = Math.max(0.18, Math.sin(sunAngle) * 0.85 + 0.35);
+            sunLight.intensity = daylight * 1.45;
+
+            const hInt = Math.floor(state.time.hour);
+            const mInt = Math.floor((state.time.hour - hInt) * 60);
+            const clockEl = document.getElementById('hud-time-clock');
+            if (clockEl) clockEl.textContent = `Tag ${state.time.day}, ${String(hInt).padStart(2, '0')}:${String(mInt).padStart(2, '0')}`;
+            const curSeason = SEASONS[state.time.seasonIndex];
+            const sIconEl = document.getElementById('hud-season-icon');
+            const sNameEl = document.getElementById('hud-season-name');
+            if (sIconEl) sIconEl.textContent = curSeason.icon;
+            if (sNameEl) sNameEl.textContent = curSeason.name;
+
+            animateHandOfGod(rawDt, now);
+
+            // Temple Beacon & Animated Construction Cranes / Fire & Smoke Plumes
+            const crystal = templeGroup.getObjectByName('manaCrystal');
+            if (crystal) {
+                crystal.rotation.y += rawDt * 0.8;
+            }
+            buildings.forEach(b => {
+                if (b.windmillSails && b.state !== 'ruins') {
+                    b.windmillSails.rotation.z += rawDt * 1.2;
+                }
+                if (b.state === 'constructing' && b.cranePivot) {
+                    b.cranePivot.rotation.y = Math.sin(now * 0.0015 + b.x) * 0.85;
+                }
+                if (b.fireSmokeGroup && b.fireSmokeGroup.visible) {
+                    b.fireSprites.forEach((fs, idx) => {
+                        const flicker = 2.0 + Math.sin(now * 0.018 + idx * 1.7) * 0.45;
+                        fs.scale.set(flicker, flicker * 1.25, 1);
+                    });
+                    b.smokeSprites.forEach((ss) => {
+                        ss.position.y += rawDt * 1.8;
+                        if (ss.position.y > 9.5) ss.position.y = 2.8;
+                    });
+                }
+            });
+
+            // Animate Articulated Human Villagers & Builder Construction Sparks
+            villagers.forEach(v => {
+                if (state.heldObject === v) return;
+                v.userData.timer -= dt;
+
+                const unfinished = buildings.find(b => b.buildProgress < 100 || (b.hp < b.maxHp && b.hp > 0));
+                if (v.userData.role === 'Baumeister' && unfinished) {
+                    v.userData.targetX = unfinished.x + 2.1;
+                    v.userData.targetZ = unfinished.z + 2.1;
+                } else if (v.userData.timer <= 0) {
+                    v.userData.timer = 4 + Math.random() * 5;
+                    const r = 7 + Math.random() * 22;
+                    const a = Math.random() * Math.PI * 2;
+                    v.userData.targetX = Math.cos(a) * r;
+                    v.userData.targetZ = Math.sin(a) * r;
+                }
+
+                const dx = v.userData.targetX - v.position.x;
+                const dz = v.userData.targetZ - v.position.z;
+                const d = Math.hypot(dx, dz);
+                const limbs = v.userData.limbs;
+
+                if (d > 0.45) {
+                    v.position.x += (dx / d) * 3.1 * dt;
+                    v.position.z += (dz / d) * 3.1 * dt;
+                    v.position.y = getTerrainHeight(v.position.x, v.position.z);
+                    v.rotation.y = Math.atan2(dx, dz);
+
+                    v.userData.walkPhase += dt * 9.0;
+                    if (limbs) {
+                        limbs.leftLegPivot.rotation.x = Math.sin(v.userData.walkPhase) * 0.6;
+                        limbs.rightLegPivot.rotation.x = -Math.sin(v.userData.walkPhase) * 0.6;
+                        limbs.leftArmPivot.rotation.x = -Math.sin(v.userData.walkPhase) * 0.5;
+                        limbs.rightArmPivot.rotation.x = Math.sin(v.userData.walkPhase) * 0.5;
+                    }
+                } else if (limbs) {
+                    limbs.leftLegPivot.rotation.x *= 0.85;
+                    limbs.rightLegPivot.rotation.x *= 0.85;
+                    limbs.rightArmPivot.rotation.x = -0.65 + Math.sin(now * 0.014) * 0.62;
+                    if (unfinished && Math.hypot(unfinished.x - v.position.x, unfinished.z - v.position.z) < 4.8) {
+                        unfinished.buildProgress = Math.min(100, unfinished.buildProgress + dt * 5.8);
+                        unfinished.hp = Math.min(unfinished.maxHp, unfinished.hp + dt * 3.8);
+                        updateBuildingVisualState(unfinished);
+
+                        v.userData.sparkTimer = (v.userData.sparkTimer || 0) - rawDt;
+                        if (v.userData.sparkTimer <= 0) {
+                            v.userData.sparkTimer = 0.45;
+                            spawnMiracleParticles(v.position, 0xfde047, 2);
+                        }
+                    }
+                }
+            });
+
+            economyAccumulator += dt;
+            if (economyAccumulator >= 2.8) {
+                economyAccumulator = 0;
+                const seasonMult = SEASONS[state.time.seasonIndex].foodMult;
+                state.resources.food += 3 * seasonMult;
+                state.resources.wood += 2;
+                state.resources.mana = Math.min(999, state.resources.mana + 4);
+                addFaith(1.4);
+                if (villagers.length < state.resources.maxPop && state.resources.food > 90 && Math.random() < 0.3) {
+                    spawnVillager((Math.random() - 0.5) * 14, (Math.random() - 0.5) * 14, 'Bauer');
+                }
+                updateHUD();
+            }
+
+            updateCreatureAI(dt, now);
+
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                if (p.userData.vx !== undefined) {
+                    p.position.x += p.userData.vx * rawDt;
+                    p.position.z += p.userData.vz * rawDt;
+                    p.userData.vy -= (p.userData.gravity || 12) * rawDt;
+                }
+                p.position.y += p.userData.vy * rawDt;
+                const floorY = getTerrainHeight(p.position.x, p.position.z);
+                if (p.position.y < floorY + 0.15 && p.userData.gravity) {
+                    p.position.y = floorY + 0.15;
+                    p.userData.vy *= -0.35;
+                    p.userData.vx *= 0.6;
+                    p.userData.vz *= 0.6;
+                }
+                p.userData.life -= rawDt;
+                if (p.userData.life <= 0) {
+                    scene.remove(p);
+                    particles.splice(i, 1);
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        window.onload = function() {
+            initStartingCivilization();
+            renderCreatureSlotBars();
+            updateHUD();
+            requestAnimationFrame(animate);
+        };
+    </script>
+</body>
+</html>

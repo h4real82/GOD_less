@@ -1,0 +1,66 @@
+* {
+            user-select: none;
+            -webkit-user-select: none;
+            box-sizing: border-box;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #060911;
+            font-family: 'Inter', sans-serif;
+            color: #f8fafc;
+        }
+        .font-cinzel {
+            font-family: 'Cinzel', serif;
+        }
+        #webgl-container {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+        #gesture-canvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 15;
+            pointer-events: none;
+        }
+        #lightning-fx-canvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 42;
+            pointer-events: none;
+        }
+        .aoe-panel {
+            background: linear-gradient(180deg, rgba(15, 23, 42, 0.90) 0%, rgba(9, 13, 24, 0.95) 100%);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid rgba(212, 175, 55, 0.36);
+            box-shadow: 0 14px 36px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 235, 160, 0.18);
+        }
+        .godless-title-glow {
+            text-shadow: 0 0 28px rgba(245, 158, 11, 0.55), 0 0 65px rgba(56, 189, 248, 0.35), 0 6px 18px rgba(0, 0, 0, 0.95);
+        }
+        .godless-card {
+            transition: transform 0.16s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.25s ease, box-shadow 0.25s ease;
+            transform-style: preserve-3d;
+        }
+        .godless-card:hover {
+            border-color: rgba(251, 191, 36, 0.78);
+            box-shadow: 0 22px 48px rgba(0, 0, 0, 0.8), 0 0 28px rgba(245, 158, 11, 0.25);
+        }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
